@@ -262,6 +262,43 @@ device_modify.addArgument(
   }
 );
 
+device_pool = device_subparsers.addParser('pool', {
+  addHelp: true
+});
+device_pool.addArgument(
+  ['device'],
+  {
+    type: 'string',
+    help: 'device name'
+  }
+);
+device_pool.addArgument(
+  ['worker'],
+  {
+    type: 'string',
+    help: 'worker name'
+  }
+);
+device_pool_group = device_pool.addMutuallyExclusiveGroup({
+  required: true
+});
+device_pool_group.addArgument(
+  ['-a', '--add'],
+  {
+    type: 'string',
+    help: 'add a worker',
+    action: 'storeTrue'
+  }
+);
+device_pool_group.addArgument(
+  ['-r', '--remove'],
+  {
+    type: 'string',
+    help: 'remove a worker',
+    action: 'storeTrue'
+  }
+);
+
 var queue = subparsers.addParser('queue', {
   addHelp: true
 });

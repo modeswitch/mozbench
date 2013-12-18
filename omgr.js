@@ -20,7 +20,6 @@ var wkr_socks = {};
 function load_devices() {
   Device.fetch_all(db, function(err, devices) {
     DEVICES = devices;
-    console.log(DEVICES);
     load_workers();
   });
 }
@@ -28,7 +27,6 @@ function load_devices() {
 function load_workers() {
   Worker.fetch_all(db, function(err, workers) {
     WORKERS = workers;
-    console.log(WORKERS);
     load_device_pools();
   });
 }
@@ -37,7 +35,6 @@ function load_device_pools() {
   DevicePool.fetch_all(db, function(err, device_pools) {
     if(err) throw err;
     DEVICE_POOLS = device_pools;
-    console.log(DEVICE_POOLS);
     main();
   });
 }
@@ -56,11 +53,9 @@ browser.on('serviceUp', function(svc_inst) {
       if(err) return;
       WORKERS[wkr_name] = wkr;
       console.log('new worker online')
-      console.log(WORKERS);
     });
   } else {
     console.log('worker online');
-    console.log(WORKERS);
   }
   wkr_socks[wkr_name] = wkr_sock;
 });
@@ -69,7 +64,6 @@ browser.on('serviceDown', function(svc_inst) {
   wkr_socks[wkr_name].close();
   delete wkr_socks[wkr_name];
   console.log('worker offline');
-  console.log(WORKERS);
 });
 
 // TODO: start web server
@@ -124,6 +118,15 @@ function cmd_device(msg, callback) {
     case 'remove':
       cmd_device_remove(msg, callback);
       break;
+    case 'modify':
+      cmd_device_modify(msg, callback);
+      break;
+    case 'info':
+      cmd_device_info(msg, callback);
+      break;
+    case 'pool':
+      cmd_device_pool(msg, callback);
+      break;
     default:
       callback({'error': 'not implemented'});
   }
@@ -131,11 +134,8 @@ function cmd_device(msg, callback) {
 
 function cmd_worker(msg, callback) {
   switch(msg.subcommand) {
-    case 'add':
-      cmd_worker_add(msg, callback);
-      break;
-    case 'remove':
-      cmd_worker_remove(msg, callback);
+    case 'forget':
+      cmd_worker_forget(msg, callback);
       break;
     case 'info':
       cmd_worker_info(msg, callback);
@@ -189,36 +189,60 @@ function cmd_device_remove(msg, callback) {
   });
 }
 
-function cmd_worker_add(msg, callback) {
-  if(!_(WORKERS).has(msg.worker)) {
-    return callback({'error': 'worker does not exist'});
-  }
-
+function cmd_device_pool(msg, callback) {
   if(!_(DEVICES).has(msg.device)) {
     return callback({'error': 'device does not exist'});
   }
 
-  if(!(msg.device in DEVICE_POOLS)) {
-    var device_pool = new DevicePool(msg.device, [msg.worker]);
-    device_pool.flush(db, function(err) {
-      if(err) {
-        return callback({'error': err});
-      }
+  if(msg.add) {
+    if(!_(WORKERS).has(msg.worker)) {
+      return callback({'error': 'worker does not exist'});
+    }
 
-      DEVICE_POOLS[msg.device] = device_pool;
-      return callback({});
-    });
-  } else if(!_(DEVICE_POOLS[msg.device].workers).contains(msg.worker)) {
+    if(!_(DEVICE_POOLS).has(msg.device)) {
+      var device_pool = new DevicePool(msg.device, [msg.worker]);
+      device_pool.flush(db, function(err) {
+        if(err) {
+          return callback({'error': err});
+        }
+
+        DEVICE_POOLS[msg.device] = device_pool;
+        console.log('worker added to device pool');
+        return callback({});
+      });
+    } else if(!_(DEVICE_POOLS[msg.device].workers).contains(msg.worker)) {
+      var device_pool = DEVICE_POOLS[msg.device];
+      device_pool.workers.push(msg.worker);
+      device_pool.flush(db, function(err) {
+        if(err) {
+          return callback({'error': err});
+        }
+
+        console.log('worker added to device pool');
+        return callback({});
+      });
+    } else {
+      return callback({'warning': 'worker already in device pool'});
+    }
+  } else if(msg.remove) {
+    if(!_(WORKERS).has(msg.worker)) {
+      return callback({'error': 'worker does not exist'});
+    }
+
+    if(!_(DEVICE_POOLS).has(msg.device) ||
+       !_(DEVICE_POOLS[msg.device].workers).contains(msg.worker)) {
+      return callback({'warning': 'working not in device pool'});
+    }
+
     var device_pool = DEVICE_POOLS[msg.device];
-    device_pool.workers.push(msg.worker);
+    device_pool.workers = _(device_pool.workers).without(msg.worker);
     device_pool.flush(db, function(err) {
       if(err) {
         return callback({'error': err});
       }
 
+      console.log('worker removed from device pool');
       return callback({});
     });
-  } else {
-    return callback({'warning': 'worker already in device pool'});
   }
 }

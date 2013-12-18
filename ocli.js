@@ -2,24 +2,7 @@
 
 var zmq = require('zmq');
 var argparse = require('argparse');
-
-function do_error(msg) {
-  console.error('\n  error: %s\n', msg);
-  process.exit();
-}
-
-function required(name, msg) {
-  if(undefined === name)
-    do_error(msg);
-  else
-    return name
-}
-
-function Message(command, subcommand, args) {
-  this.command = command;
-  this.subcommand = subcommand;
-  this.args = args;
-}
+var prettyjson = require('prettyjson');
 
 var ArgumentParser = argparse.ArgumentParser;
 var parser = new ArgumentParser({
@@ -40,18 +23,30 @@ var subparsers = parser.addSubparsers({
   dest: 'command'
 });
 
-var workers = subparsers.addParser('workers', {
+var debug = subparsers.addParser('debug', {
   addHelp: true
 });
-var workers_subparsers = workers.addSubparsers({
+var debug_subparsers = debug.addSubparsers({
   title: 'Commands',
   dest: 'subcommand'
 })
 
-workers_info = workers_subparsers.addParser('info', {
+debug_dump = debug_subparsers.addParser('dump', {
   addHelp: true
 });
-workers_info.addArgument(
+
+var worker = subparsers.addParser('worker', {
+  addHelp: true
+});
+var worker_subparsers = worker.addSubparsers({
+  title: 'Commands',
+  dest: 'subcommand'
+})
+
+worker_info = worker_subparsers.addParser('info', {
+  addHelp: true
+});
+worker_info.addArgument(
   ['-n', '--name'],
   {
     type: 'string',
@@ -62,7 +57,7 @@ workers_info.addArgument(
   }
 );
 
-workers_info.addArgument(
+worker_info.addArgument(
   ['-d', '--device'],
   {
     type: 'string',
@@ -73,17 +68,17 @@ workers_info.addArgument(
   }
 );
 
-workers_add = workers_subparsers.addParser('add', {
+worker_add = worker_subparsers.addParser('add', {
   addHelp: true
 });
-workers_add.addArgument(
+worker_add.addArgument(
   ['worker'],
   {
     type: 'string',
     help: 'worker name'
   }
 );
-workers_add.addArgument(
+worker_add.addArgument(
   ['device'],
   {
     type: 'string',
@@ -91,17 +86,17 @@ workers_add.addArgument(
   }
 );
 
-workers_remove = workers_subparsers.addParser('remove', {
+worker_remove = worker_subparsers.addParser('remove', {
   addHelp: true
 });
-workers_remove.addArgument(
+worker_remove.addArgument(
   ['worker'],
   {
     type: 'string',
     help: 'worker name'
   }
 );
-workers_remove.addArgument(
+worker_remove.addArgument(
   ['device'],
   {
     type: 'string',
@@ -109,18 +104,18 @@ workers_remove.addArgument(
   }
 );
 
-var devices = subparsers.addParser('devices', {
+var device = subparsers.addParser('device', {
   addHelp: true
 });
-var devices_subparsers = devices.addSubparsers({
+var device_subparsers = device.addSubparsers({
   title: 'Commands',
   dest: 'subcommand'
 })
 
-devices_info = devices_subparsers.addParser('info', {
+device_info = device_subparsers.addParser('info', {
   addHelp: true
 });
-devices_info.addArgument(
+device_info.addArgument(
   ['-n', '--name'],
   {
     type: 'string',
@@ -129,7 +124,7 @@ devices_info.addArgument(
     action: 'append'
   }
 );
-devices_info.addArgument(
+device_info.addArgument(
   ['-o', '--operating-system'],
   {
     type: 'string',
@@ -138,7 +133,7 @@ devices_info.addArgument(
     action: 'append'
   }
 );
-devices_info.addArgument(
+device_info.addArgument(
   ['-c', '--processor'],
   {
     type: 'string',
@@ -147,7 +142,7 @@ devices_info.addArgument(
     action: 'append'
   }
 );
-devices_info.addArgument(
+device_info.addArgument(
   ['-m', '--memory'],
   {
     type: 'string',
@@ -156,7 +151,7 @@ devices_info.addArgument(
     action: 'append'
   }
 );
-devices_info.addArgument(
+device_info.addArgument(
   ['-g', '--graphics-card'],
   {
     type: 'string',
@@ -166,17 +161,17 @@ devices_info.addArgument(
   }
 );
 
-devices_add = devices_subparsers.addParser('add', {
+device_add = device_subparsers.addParser('add', {
   addHelp: true
 });
-devices_add.addArgument(
+device_add.addArgument(
   ['name'],
   {
     type: 'string',
     help: 'device name'
   }
 );
-devices_add.addArgument(
+device_add.addArgument(
   ['-o', '--operating-system'],
   {
     type: 'string',
@@ -185,7 +180,7 @@ devices_add.addArgument(
     dest: 'os'
   }
 );
-devices_add.addArgument(
+device_add.addArgument(
   ['-c', '--processor'],
   {
     type: 'string',
@@ -194,7 +189,7 @@ devices_add.addArgument(
     dest: 'cpu'
   }
 );
-devices_add.addArgument(
+device_add.addArgument(
   ['-m', '--memory'],
   {
     type: 'string',
@@ -203,7 +198,7 @@ devices_add.addArgument(
     dest: 'memory'
   }
 );
-devices_add.addArgument(
+device_add.addArgument(
   ['-g', '--graphics-card'],
   {
     type: 'string',
@@ -213,10 +208,10 @@ devices_add.addArgument(
   }
 );
 
-devices_remove = devices_subparsers.addParser('remove', {
+device_remove = device_subparsers.addParser('remove', {
   addHelp: true
 });
-devices_remove.addArgument(
+device_remove.addArgument(
   ['name'],
   {
     type: 'string',
@@ -224,17 +219,17 @@ devices_remove.addArgument(
   }
 );
 
-devices_modify = devices_subparsers.addParser('modify', {
+device_modify = device_subparsers.addParser('modify', {
   addHelp: true
 });
-devices_modify.addArgument(
+device_modify.addArgument(
   ['name'],
   {
     type: 'string',
     help: 'device name'
   }
 );
-devices_modify.addArgument(
+device_modify.addArgument(
   ['-o', '--operating-system'],
   {
     type: 'string',
@@ -242,7 +237,7 @@ devices_modify.addArgument(
     nargs: '?'
   }
 );
-devices_modify.addArgument(
+device_modify.addArgument(
   ['-c', '--processor'],
   {
     type: 'string',
@@ -250,7 +245,7 @@ devices_modify.addArgument(
     nargs: '?'
   }
 );
-devices_modify.addArgument(
+device_modify.addArgument(
   ['-m', '--memory'],
   {
     type: 'string',
@@ -258,7 +253,7 @@ devices_modify.addArgument(
     nargs: '?'
   }
 );
-devices_modify.addArgument(
+device_modify.addArgument(
   ['-g', '--graphics-card'],
   {
     type: 'string',
@@ -369,88 +364,10 @@ var client_sock = zmq.socket('req');
 client_sock.connect(mgr_addr);
 
 client_sock.on('message', function(msg) {
-  console.log(msg.toString());
   client_sock.close();
+  var result = JSON.parse(msg.toString());
+  console.log(prettyjson.render(result));
 });
 
 var msg = JSON.stringify(args);
 client_sock.send(msg);
-
-function cmd_workers_info(args) {
-  var command = args.command;
-  var subcommand = args.subcommand;
-
-  var name = [].concat.apply([], args.name);
-  name = name.filter(function(e, p) {
-    return name.indexOf(e) == p;
-  });
-
-  var device = [].concat.apply([], args.device);
-  device = device.filter(function(e, p) {
-    return device.indexOf(e) == p;
-  });
-
-  var mgr_host = args.manager;
-  var mgr_addr = 'tcp://' + mgr_host + ':9000';
-
-  var client_sock = zmq.socket('req');
-  client_sock.connect(mgr_addr);
-
-  client_sock.on('message', function(msg) {
-    console.log(msg.toString());
-    client_sock.close();
-  });
-
-  var msg = JSON.stringify(new Message(command, subcommand, [name, device]));
-  client_sock.send(msg);
-}
-
-/*
-program
-  .command('queue <device> <browser> <benchmark>')
-  .description('queue a benchmark to run')
-  .option('-r, --replicates <replicates>', 'number of replicates to run')
-  .action(function(benchmark, cmd) {
-    console.log(benchmark);
-  });
-*/
-
-/*
-program
-  .command('show <object>')
-  .action(function(object, cmd) {
-    var mgr_host = required(program.manager, 'missing manager network address');
-    var mgr_addr = 'tcp://' + mgr_host + ':9000';
-
-    var client_sock = zmq.socket('req');
-    client_sock.connect(mgr_addr);
-
-    client_sock.on('message', function(msg) {
-      console.log(msg.toString());
-      client_sock.close();
-    });
-
-    var msg = JSON.stringify(new Message('show', [object]));
-    client_sock.send(msg);
-  });
-*/
-
-/*
-program
-  .command('assign <device> <worker>')
-  .action(function(device, worker, cmd) {
-    var mgr_host = required(program.manager, 'missing manager network address');
-    var mgr_addr = 'tcp://' + mgr_host + ':9000';
-
-    var client_sock = zmq.socket('req');
-    client_sock.connect(mgr_addr);
-
-    client_sock.on('message', function(msg) {
-      console.log(msg.toString());
-      client_sock.close();
-    });
-
-    var msg = JSON.stringify(new Message('assign', [device, worker]));
-    client_sock.send(msg);
-  });
-*/

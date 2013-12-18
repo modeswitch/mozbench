@@ -88,14 +88,17 @@ function main() {
     msg = JSON.parse(msg);
     var command = msg.command;
     switch(command) {
-      case 'devices':
-        cmd_devices(msg, reply.bind(this));
+      case 'device':
+        cmd_device(msg, reply.bind(this));
         break;
-      case 'workers':
-        cmd_workers(msg, reply.bind(this));
+      case 'worker':
+        cmd_worker(msg, reply.bind(this));
         break;
       case 'queue':
         cmd_queue(msg, reply.bind(this));
+        break;
+      case 'debug':
+        cmd_debug(msg, reply.bind(this));
         break;
       default:
         reply.call(this, {'error': 'not implemented'});
@@ -103,36 +106,54 @@ function main() {
   });
 }
 
-function cmd_devices(msg, callback) {
+function cmd_debug(msg, callback) {
   switch(msg.subcommand) {
-    case 'add':
-      cmd_devices_add(msg, callback);
-      break;
-    case 'remove':
-      cmd_devices_remove(msg, callback);
+    case 'dump':
+      cmd_debug_dump(msg, callback);
       break;
     default:
       callback({'error': 'not implemented'});
   }
 }
 
-function cmd_workers(msg, callback) {
+function cmd_device(msg, callback) {
   switch(msg.subcommand) {
     case 'add':
-      cmd_workers_add(msg, callback);
+      cmd_device_add(msg, callback);
       break;
     case 'remove':
-      cmd_workers_remove(msg, callback);
+      cmd_device_remove(msg, callback);
+      break;
+    default:
+      callback({'error': 'not implemented'});
+  }
+}
+
+function cmd_worker(msg, callback) {
+  switch(msg.subcommand) {
+    case 'add':
+      cmd_worker_add(msg, callback);
+      break;
+    case 'remove':
+      cmd_worker_remove(msg, callback);
       break;
     case 'info':
-      cmd_workers_info(msg, callback);
+      cmd_worker_info(msg, callback);
       break;
     default:
       callback({'error': 'not implemented'})
   }
 }
 
-function cmd_devices_add(msg, callback) {
+function cmd_debug_dump(msg, callback) {
+  return callback({
+    'devices': DEVICES,
+    'workers': WORKERS,
+    'device_pools': DEVICE_POOLS
+  });
+}
+
+function cmd_device_add(msg, callback) {
   if(_(DEVICES).has(msg.name)) {
     return callback({'error': 'device exists'});
   }
@@ -144,13 +165,12 @@ function cmd_devices_add(msg, callback) {
     }
 
     DEVICES[msg.name] = device;
-    console.log('devices add:', msg.name);
-    console.log('devices:', DEVICES);
+    console.log('device add:', msg.name);
     return callback({});
   });
 }
 
-function cmd_devices_remove(msg, callback) {
+function cmd_device_remove(msg, callback) {
   if(!_(DEVICES).has(msg.name)) {
     return callback({'error': 'device does not exists'});
   }
@@ -164,13 +184,12 @@ function cmd_devices_remove(msg, callback) {
     }
 
     delete DEVICES[msg.name];
-    console.log('devices remove:', msg.name);
-    console.log('devices:', DEVICES);
+    console.log('device remove:', msg.name);
     return callback({});
   });
 }
 
-function cmd_workers_add(msg, callback) {
+function cmd_worker_add(msg, callback) {
   if(!_(WORKERS).has(msg.worker)) {
     return callback({'error': 'worker does not exist'});
   }

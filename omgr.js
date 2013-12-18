@@ -7,6 +7,7 @@ var sqlite = require('sqlite3').verbose();
 
 var Device = require('./device');
 var Worker = require('./worker');
+var DevicePool = require('./device-pool');
 
 var db = new sqlite.Database('overwatch.sqlite');
 
@@ -21,36 +22,53 @@ function load_devices() {
     console.log(DEVICES);
     load_workers();
   });
-};
+}
 
 function load_workers() {
   Worker.fetch_all(db, function(err, workers) {
     WORKERS = workers;
     console.log(WORKERS);
+    load_device_pools();
+  });
+}
+
+function load_device_pools() {
+  DevicePool.fetch_all(db, function(err, device_pools) {
+    if(err) throw err;
+    DEVICE_POOLS = device_pools;
+    console.log(DEVICE_POOLS);
     main();
   });
-};
+}
 
 var wkr_svc_t = mdns.makeServiceType('overwatch', 'tcp', 'worker');
 var browser = new mdns.Browser(wkr_svc_t);
 browser.on('serviceUp', function(svc_inst) {
-  wkr_name = svc_inst.name;
-  wkr_host = svc_inst.host;
+  var wkr_name = svc_inst.name;
+  var wkr_host = svc_inst.host;
   var wkr_sock = zmq.socket('push');
   wkr_sock.connect('tcp://' + wkr_host + ':' + wkr_port);
   wkr_socks[wkr_name] = wkr_sock;
-  if(!wkr_name in workers) {
-    db.run('insert into workers (name) values(?)', [wkr_name], function(err) {
+  if(!(wkr_name in WORKERS)) {
+    var wkr = new Worker(wkr_name);
+    wkr.flush(db, function(err) {
       if(err) return;
-      workers[wkr_name] = null;
-      console.log('worker online (unassigned)')
+      WORKERS[wkr_name] = wkr;
+      console.log('new worker online')
+      console.log(WORKERS);
     });
   } else {
-    console.log('%s worker online', [workers[wkr_name]]);
+    console.log('worker online');
+    console.log(WORKERS);
   }
+  wkr_socks[wkr_name] = wkr_sock;
 });
 browser.on('serviceDown', function(svc_inst) {
-  delete workers[svc_inst.name];
+  var wkr_name = svc_inst.name;
+  wkr_socks[wkr_name].close();
+  delete wkr_socks[wkr_name];
+  console.log('worker offline');
+  console.log(WORKERS);
 });
 
 // TODO: start web server
@@ -75,17 +93,6 @@ function main() {
       default:
         reply.call(this, {'error': 'command not implemented'});
     }
-    /*
-    if('show' == msg.method) {
-      var args = msg.args.concat([reply.bind(this)]);
-      do_show.apply(undefined, args);
-    } else if('queue' == msg.method) {
-
-    } else if('assign' == msg.method) {
-      var args = msg.args.concat([reply.bind(this)]);
-      do_assign.apply(undefined, args);
-    }
-    */
   });
 }
 

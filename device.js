@@ -35,7 +35,7 @@ Device.fetch = function fetch(db, name, callback) {
     }
 
     var device = new Device(name, row.os, row.cpu, row.memory, row.gpu, true);
-    callback(null, device);
+    return callback(null, device);
   });
 };
 Device.fetch_all = function fetch_all(db, callback) {
@@ -51,7 +51,7 @@ Device.fetch_all = function fetch_all(db, callback) {
       devices[name] = device;
     });
 
-    callback(null, devices);
+    return callback(null, devices);
   });
 }
 

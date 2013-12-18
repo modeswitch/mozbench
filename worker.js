@@ -32,7 +32,7 @@ Worker.fetch = function fetch(db, name, callback) {
     }
 
     var worker = new Worker(name, true);
-    callback(null, worker);
+    return callback(null, worker);
   });
 };
 Worker.fetch_all = function fetch_all(db, callback) {
@@ -48,7 +48,7 @@ Worker.fetch_all = function fetch_all(db, callback) {
       workers[name] = worker;
     });
 
-    callback(null, workers);
+    return callback(null, workers);
   });
 }
 

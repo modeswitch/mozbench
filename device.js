@@ -6,11 +6,23 @@ function Device(name, os, cpu, memory, gpu, synced) {
   this.gpu = gpu || null;
   this.synced = (undefined === synced) ? false : true;
 }
+Device.prototype.purge = function purge(db, callback) {
+  if(this.synced) {
+    db.run('delete from devices where name=?', [this.name], function(err) {
+      if(err) {
+        return callback(err);
+      }
+
+      callback(null);
+    }.bind(this));
+  }
+};
 Device.prototype.flush = function flush(db, callback) {
   if(this.synced) {
     db.run('update devices set name=?, os=?, cpu=?, memory=?, gpu=? where name=?',
       [this.name, this.os, this.cpu, this.memory, this.gpu, this.name], function(err) {
         if(err) {
+          console.error(err);
           return callback(err);
         }
 
@@ -20,6 +32,7 @@ Device.prototype.flush = function flush(db, callback) {
     db.run('insert into devices(name, os, cpu, memory, gpu) values(?, ?, ?, ?, ?)',
       [this.name, this.os, this.cpu, this.memory, this.gpu], function(err) {
         if(err) {
+          console.error(err);
           return callback(err);
         }
 

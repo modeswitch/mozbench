@@ -73,22 +73,39 @@ workers_info.addArgument(
   }
 );
 
-workers_assign = workers_subparsers.addParser('assign', {
+workers_add = workers_subparsers.addParser('add', {
   addHelp: true
 });
-workers_assign.addArgument(
+workers_add.addArgument(
+  ['worker'],
+  {
+    type: 'string',
+    help: 'worker name'
+  }
+);
+workers_add.addArgument(
   ['device'],
   {
     type: 'string',
     help: 'device name'
   }
 );
-workers_assign.addArgument(
+
+workers_remove = workers_subparsers.addParser('remove', {
+  addHelp: true
+});
+workers_remove.addArgument(
   ['worker'],
   {
     type: 'string',
-    help: 'worker name',
-    nargs: '+'
+    help: 'worker name'
+  }
+);
+workers_remove.addArgument(
+  ['device'],
+  {
+    type: 'string',
+    help: 'device name'
   }
 );
 
@@ -153,7 +170,7 @@ devices_add = devices_subparsers.addParser('add', {
   addHelp: true
 });
 devices_add.addArgument(
-  ['device'],
+  ['name'],
   {
     type: 'string',
     help: 'device name'
@@ -200,7 +217,7 @@ devices_remove = devices_subparsers.addParser('remove', {
   addHelp: true
 });
 devices_remove.addArgument(
-  ['device'],
+  ['name'],
   {
     type: 'string',
     help: 'device name'
@@ -211,7 +228,7 @@ devices_modify = devices_subparsers.addParser('modify', {
   addHelp: true
 });
 devices_modify.addArgument(
-  ['device'],
+  ['name'],
   {
     type: 'string',
     help: 'device name'

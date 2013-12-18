@@ -5,7 +5,7 @@ function DevicePool(device, workers) {
 DevicePool.prototype.flush = function flush(db, callback) {
   var sql = [];
 
-  sql.push('being transaction');
+  sql.push('begin transaction');
   sql.push('delete from device_pools where device="' + this.device + '"')
 
   this.workers.forEach(function(worker) {

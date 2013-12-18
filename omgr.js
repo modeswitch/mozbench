@@ -4,6 +4,7 @@ var mdns = require('mdns2');
 var uuid = require('uuid');
 var arp = require('arp');
 var sqlite = require('sqlite3').verbose();
+var _ = require('lodash');
 
 var Device = require('./device');
 var Worker = require('./worker');
@@ -90,8 +91,14 @@ function main() {
       case 'devices':
         cmd_devices(msg, reply.bind(this));
         break;
+      case 'workers':
+        cmd_workers(msg, reply.bind(this));
+        break;
+      case 'queue':
+        cmd_queue(msg, reply.bind(this));
+        break;
       default:
-        reply.call(this, {'error': 'command not implemented'});
+        reply.call(this, {'error': 'not implemented'});
     }
   });
 }
@@ -105,52 +112,94 @@ function cmd_devices(msg, callback) {
       cmd_devices_remove(msg, callback);
       break;
     default:
-      callback({'error': 'command not implemented'});
+      callback({'error': 'not implemented'});
+  }
+}
+
+function cmd_workers(msg, callback) {
+  switch(msg.subcommand) {
+    case 'add':
+      cmd_workers_add(msg, callback);
+      break;
+    case 'remove':
+      cmd_workers_remove(msg, callback);
+      break;
+    case 'info':
+      cmd_workers_info(msg, callback);
+      break;
+    default:
+      callback({'error': 'not implemented'})
   }
 }
 
 function cmd_devices_add(msg, callback) {
-  if(msg.device in DEVICES) {
+  if(_(DEVICES).has(msg.name)) {
     return callback({'error': 'device exists'});
   }
 
-  db.run('insert into devices(name, os, cpu, memory, gpu) values(?, ?, ?, ?, ?)',
-    [msg.device, msg.os, msg.cpu, msg.memory, msg.gpu], function(err) {
-      if(err) {
-        return callback({'error': err});
-      }
+  var device = new Device(msg.name, msg.os, msg.cpu, msg.memory, msg.gpu);
+  device.flush(db, function(err) {
+    if(err) {
+      return callback({'error': err});
+    }
 
-      DEVICES[msg.device] = [];
-      console.log('devices add:', msg.device);
-      console.log('devices:', DEVICES);
-      return callback({});
-    });
+    DEVICES[msg.name] = device;
+    console.log('devices add:', msg.name);
+    console.log('devices:', DEVICES);
+    return callback({});
+  });
 }
 
 function cmd_devices_remove(msg, callback) {
-  if(!(msg.device in DEVICES)) {
+  if(!_(DEVICES).has(msg.name)) {
     return callback({'error': 'device does not exists'});
   }
 
-  db.run('delete from devices where name=?',
-    [msg.device], function(err) {
+  // FIXME: purge device pool
+
+  var device = DEVICES[msg.name];
+  device.purge(db, function(err) {
+    if(err) {
+      return callback({'error': err});
+    }
+
+    delete DEVICES[msg.name];
+    console.log('devices remove:', msg.name);
+    console.log('devices:', DEVICES);
+    return callback({});
+  });
+}
+
+function cmd_workers_add(msg, callback) {
+  if(!_(WORKERS).has(msg.worker)) {
+    return callback({'error': 'worker does not exist'});
+  }
+
+  if(!_(DEVICES).has(msg.device)) {
+    return callback({'error': 'device does not exist'});
+  }
+
+  if(!(msg.device in DEVICE_POOLS)) {
+    var device_pool = new DevicePool(msg.device, [msg.worker]);
+    device_pool.flush(db, function(err) {
       if(err) {
         return callback({'error': err});
       }
 
-      DEVICES[msg.device] = [];
-      console.log('devices remove:', msg.device);
-      console.log('devices:', DEVICES);
+      DEVICE_POOLS[msg.device] = device_pool;
       return callback({});
     });
-}
+  } else if(!_(DEVICE_POOLS[msg.device].workers).contains(msg.worker)) {
+    var device_pool = DEVICE_POOLS[msg.device];
+    device_pool.workers.push(msg.worker);
+    device_pool.flush(db, function(err) {
+      if(err) {
+        return callback({'error': err});
+      }
 
-function cmd_workers_assign(msg, callback) {
-  if(!msg.worker in WORKERS) {
-    return callback({'error': 'worker does not exist'});
-  }
-
-  if(!msg.device in DEVICES) {
-    return callback({'error': 'device does not exist'});
+      return callback({});
+    });
+  } else {
+    return callback({'warning': 'worker already in device pool'});
   }
 }

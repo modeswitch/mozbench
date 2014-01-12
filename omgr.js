@@ -145,6 +145,16 @@ function cmd_worker(msg, callback) {
   }
 }
 
+function cmd_queue(msg, callback) {
+  switch(msg.subcommand) {
+    case 'add':
+      cmd_queue_add(msg, callback);
+      break;
+    default:
+      callback({'error': 'not implemented'})
+  }
+}
+
 function cmd_debug_dump(msg, callback) {
   return callback({
     'devices': DEVICES,
@@ -235,7 +245,7 @@ function cmd_device_pool(msg, callback) {
     }
 
     var device_pool = DEVICE_POOLS[msg.device];
-    device_pool.workers = _(device_pool.workers).without(msg.worker);
+    device_pool.workers = _.without(device_pool.workers, msg.worker);
     device_pool.flush(db, function(err) {
       if(err) {
         return callback({'error': err});
@@ -245,4 +255,8 @@ function cmd_device_pool(msg, callback) {
       return callback({});
     });
   }
+}
+
+function cmd_queue_add(msg, callback) {
+  callback({});
 }

@@ -9,6 +9,17 @@ CREATE TABLE browsers (
     PRIMARY KEY(name)
 );
 
+DROP TABLE IF EXISTS channels;
+CREATE TABLE channels (
+    name VARCHAR(128),
+
+    -- URL path to installer
+    path VARCHAR(1024),
+    browser VARCHAR(128),
+    FOREIGN KEY (browser) REFERENCES browsers(name),
+    PRIMARY KEY (name, browser)
+);
+
 DROP TABLE IF EXISTS benchmarks;
 CREATE TABLE benchmarks (
     name VARCHAR(128) NOT NULL,
@@ -16,7 +27,7 @@ CREATE TABLE benchmarks (
 
     -- URL path to benchmark
     path VARCHAR(1024),
-    PRIMARY KEY(name)
+    PRIMARY KEY(name, version)
 );
 
 DROP TABLE IF EXISTS devices;
@@ -44,14 +55,6 @@ CREATE TABLE device_pools (
     PRIMARY KEY(worker, device)
 );
 
-DROP TABLE IF EXISTS channels;
-CREATE TABLE channels (
-    name VARCHAR(128),
-    browser VARCHAR(128),
-    FOREIGN KEY (browser) REFERENCES browsers(name),
-    PRIMARY KEY (name, browser)
-);
-
 DROP TABLE IF EXISTS jobs;
 CREATE TABLE jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,20 +78,20 @@ CREATE TABLE tasks (
 
 -- Initial settings
 
---INSERT INTO browsers (name) VALUES('firefox');
---INSERT INTO browsers (name) VALUES('chrome');
+INSERT INTO browsers (name, path) VALUES('firefox', 'firefox');
+INSERT INTO browsers (name, path) VALUES('chrome', 'chrome');
 
---INSERT INTO channels (name, browser) VALUES('release', 'firefox');
---INSERT INTO channels (name, browser) VALUES('beta', 'firefox');
---INSERT INTO channels (name, browser) VALUES('aurora', 'firefox');
---INSERT INTO channels (name, browser) VALUES('nightly', 'firefox');
---INSERT INTO channels (name, browser) VALUES('stable', 'chrome');
---INSERT INTO channels (name, browser) VALUES('beta', 'chrome');
---INSERT INTO channels (name, browser) VALUES('dev', 'chrome');
---INSERT INTO channels (name, browser) VALUES('canary', 'chrome');
+INSERT INTO channels (name, path, browser) VALUES('release', 'release', 'firefox');
+INSERT INTO channels (name, path, browser) VALUES('beta', 'beta', 'firefox');
+INSERT INTO channels (name, path, browser) VALUES('aurora', 'aurora', 'firefox');
+INSERT INTO channels (name, path, browser) VALUES('nightly', 'nightly', 'firefox');
+INSERT INTO channels (name, path, browser) VALUES('stable', 'stable', 'chrome');
+INSERT INTO channels (name, path, browser) VALUES('beta', 'beta', 'chrome');
+INSERT INTO channels (name, path, browser) VALUES('dev', 'dev', 'chrome');
+INSERT INTO channels (name, path, browser) VALUES('canary', 'canary', 'chrome');
 
---INSERT INTO benchmarks (name, version, path) VALUES('octane', '1.0', 'octane');
---INSERT INTO benchmarks (name, version, path) VALUES('octane', '2.0', 'octane-2.0');
---INSERT INTO benchmarks (name, version, path) VALUES('sunspider', '1.0', 'sunspider-1.0');
---INSERT INTO benchmarks (name, version, path) VALUES('kraken', '1.1', 'kraken');
---INSERT INTO benchmarks (name, version, path) VALUES('canvasmark', 'v6', 'canvasmark');
+INSERT INTO benchmarks (name, version, path) VALUES('octane', '1.0', 'octane');
+INSERT INTO benchmarks (name, version, path) VALUES('octane', '2.0', 'octane-2.0');
+INSERT INTO benchmarks (name, version, path) VALUES('sunspider', '1.0', 'sunspider-1.0');
+INSERT INTO benchmarks (name, version, path) VALUES('kraken', '1.1', 'kraken');
+INSERT INTO benchmarks (name, version, path) VALUES('canvasmark', 'v6', 'canvasmark');

@@ -31,28 +31,27 @@ function Manager() {
   var cli_sock = this.cli_sock_ = zmq.socket('rep');
   var wkr_sock = this.wkr_sock_ = zmq.socket('pull');
 
-  this.handler = function handler(msg) {
+  this.cli_sock_handler = function cli_sock_handler(msg) {
     var sock = this;
     function reply(msg) {
       sock.send(JSON.stringify(msg));
     }
 
     msg = JSON.parse(msg);
-    manager.emit(Manager.E_COMMAND, msg, reply);
+    reply(msg);
   };
 }
 
 inherits(Manager, EventEmitter);
 
 Manager.E_READY = 'READY';
-Manager.E_COMMAND = 'COMMAND';
 
 Manager.prototype.start = function start() {
   this.cli_sock_.bindSync('tcp://0.0.0.0:' + this.cli_port_);
-  this.cli_sock_.on('message', this.handler);
+  this.cli_sock_.on('message', this.cli_sock_handler);
 
   this.wkr_sock_.bindSync('tcp://0.0.0.0:' + this.wkr_port_);
-  this.wkr_sock_.on('message', this.handler);
+  // this.wkr_sock_.on('message', this.handler);
 
   this.mdns_cli_ad_.start();
   this.mdns_wkr_ad_.start();

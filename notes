@@ -1,0 +1,9 @@
+var cli_dispatcher = new client.Dispatcher();
+
+var operation = {
+  'command': 'debug',
+  'subcommand': 'noop',
+  ...
+}
+
+cli_dispatcher(operation);

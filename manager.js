@@ -20,26 +20,40 @@ function MdnsAd(port, name) {
 }
 
 function Manager() {
-  var that = this;
+  var manager = this;
 
-  var cli_port = 9000;
-  var wkr_port = 9001;
+  var cli_port = this.cli_port_ = 9000;
+  var wkr_port = this.wkr_port_ = 9001;
 
-  var mdns_cli_ad = new MdnsAd(cli_port, 'overwatch-cli');
-  var mdns_wkr_ad = new MdnsAd(wkr_port, 'overwatch-wkr');
+  var mdns_cli_ad = this.mdns_cli_ad_ = new MdnsAd(cli_port, 'overwatch-cli');
+  var mdns_wkr_ad = this.mdns_wkr_ad_ = new MdnsAd(wkr_port, 'overwatch-wkr');
 
-  var cli_sock = zmq.socket('rep');
-  var wkr_sock = zmq.socket('pull');
+  var cli_sock = this.cli_sock_ = zmq.socket('rep');
+  var wkr_sock = this.wkr_sock_ = zmq.socket('pull');
 
-  this.mdns_cli_ad_ = mdns_cli_ad;
-  this.mdns_wkr_ad_ = mdns_wkr_ad;
+  this.handler = function handler(msg) {
+    var sock = this;
+    function reply(msg) {
+      sock.send(JSON.stringify(msg));
+    }
+
+    msg = JSON.parse(msg);
+    manager.emit(Manager.E_COMMAND, msg, reply);
+  };
 }
 
 inherits(Manager, EventEmitter);
 
 Manager.E_READY = 'READY';
+Manager.E_COMMAND = 'COMMAND';
 
 Manager.prototype.start = function start() {
+  this.cli_sock_.bindSync('tcp://0.0.0.0:' + this.cli_port_);
+  this.cli_sock_.on('message', this.handler);
+
+  this.wkr_sock_.bindSync('tcp://0.0.0.0:' + this.wkr_port_);
+  this.wkr_sock_.on('message', this.handler);
+
   this.mdns_cli_ad_.start();
   this.mdns_wkr_ad_.start();
 
@@ -51,6 +65,9 @@ Manager.prototype.start = function start() {
 Manager.prototype.stop = function stop() {
   this.mdns_cli_ad_.stop();
   this.mdns_wkr_ad_.stop();
+
+  this.cli_sock_.close();
+  this.wkr_sock_.close();
 };
 
 module.exports = Manager;

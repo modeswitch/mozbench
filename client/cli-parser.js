@@ -10,13 +10,14 @@ parser.addArgument(
   ['-M', '--manager'],
   {
     type: 'string',
-    help: 'remote manager network address'
+    help: 'remote manager network address',
+    dest: '@manager'
   }
 );
 
 var subparsers = parser.addSubparsers({
   title: 'Commands',
-  dest: 'command',
+  dest: '@command',
 });
 
 var debug = subparsers.addParser('debug', {
@@ -24,7 +25,7 @@ var debug = subparsers.addParser('debug', {
 });
 var debug_subparsers = debug.addSubparsers({
   title: 'Commands',
-  dest: 'subcommand'
+  dest: '@subcommand'
 })
 
 debug_dump = debug_subparsers.addParser('test', {
@@ -36,7 +37,7 @@ var worker = subparsers.addParser('worker', {
 });
 var worker_subparsers = worker.addSubparsers({
   title: 'Commands',
-  dest: 'subcommand'
+  dest: '@subcommand'
 })
 
 worker_info = worker_subparsers.addParser('info', {
@@ -105,7 +106,7 @@ var device = subparsers.addParser('device', {
 });
 var device_subparsers = device.addSubparsers({
   title: 'Commands',
-  dest: 'subcommand'
+  dest: '@subcommand'
 })
 
 device_info = device_subparsers.addParser('info', {
@@ -300,7 +301,7 @@ var queue = subparsers.addParser('queue', {
 });
 var queue_subparsers = queue.addSubparsers({
   title: 'Commands',
-  dest: 'subcommand'
+  dest: '@subcommand'
 })
 
 queue_info = queue_subparsers.addParser('info', {

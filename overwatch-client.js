@@ -5,6 +5,7 @@ var zmq = require('zmq');
 var prettyjson = require('prettyjson');
 var util = require('util');
 var parser = require('./client/cli-parser');
+var _ = require('lodash');
 
 var args = parser.parseArgs();
 
@@ -51,6 +52,12 @@ function send_command(mgr_addr) {
     console.log(prettyjson.render(result));
   });
 
-  var msg = JSON.stringify(args);
+  var params = _.omit(args, function(v, k) { return 'function' == typeof v || '@' == k[0]; });
+  var cmd = {
+    method: args['@command'] + '.' + args['@subcommand'],
+    params: params
+  };
+
+  var msg = JSON.stringify(cmd);
   client_sock.send(msg);
 }

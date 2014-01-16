@@ -22,32 +22,52 @@ function MdnsAd(port, name) {
 function Manager() {
   var manager = this;
 
-  var cli_port = this.cli_port_ = 9000;
-  var mgr_port = this.mgr_port_ = 9001;
+  var cli_port = 9000;
+  var cli_addr = 'tcp://*:' + cli_port;
+  var mgr_port = 9001;
+  var mgr_addr = 'tcp://*:' + mgr_port;
 
-  var mdns_browser = this.mdns_browser_ = new mdns.Browser('overwatch-wkr');
-  mdns_browser.on(mdns.Browser.E_SERVICE_UP, function(svc) {
-    console.log(svc);
-  });
+  var mdns_cli_ad = new mdns.Ad(cli_port, 'overwatch-cli');
+  var mdns_mgr_ad = new mdns.Ad(mgr_port, 'overwatch-mgr');
 
-  var mdns_cli_ad = this.mdns_cli_ad_ = new mdns.Ad(cli_port, 'overwatch-cli');
-  var mdns_mgr_ad = this.mdns_mgr_ad_ = new mdns.Ad(mgr_port, 'overwatch-mgr');
+  var cli_sock = zmq.socket('rep');
+  var mgr_sock = zmq.socket('router');
+  mgr_sock.id = 'manager';
 
-  var cli_sock = this.cli_sock_ = zmq.socket('rep');
-  var mgr_sock = this.mgr_sock_ = zmq.socket('pull');
-
-  this.cli_sock_handler = function cli_sock_handler(msg) {
-    var sock = this;
+  function handle_cli_message(data) {
     function reply(msg) {
-      sock.send(JSON.stringify(msg));
+      cli_sock.send(JSON.stringify(msg));
     }
 
-    msg = JSON.parse(msg);
+    msg = JSON.parse(data.toString());
     reply(msg);
-  };
+  }
 
-  this.mgr_sock_handler = function mgr_sock_handler(msg) {
+  function handle_mgr_message(envelope, delimiter, data) {
+    console.log(envelope.toString(), data.toString());
+  }
 
+  this.start = function start() {
+    cli_sock.bindSync(cli_addr);
+    cli_sock.on('message', handle_cli_message);
+
+    mgr_sock.bindSync(mgr_addr);
+    mgr_sock.on('message', handle_mgr_message);
+
+    mdns_cli_ad.start();
+    mdns_mgr_ad.start();
+
+    setTimeout(function() {
+      manager.emit(Manager.E_READY);
+    }, 0);
+  }
+
+  this.stop = function stop() {
+    mdns_cli_ad.stop();
+    mdns_mgr_ad.stop();
+
+    cli_sock.close();
+    mgr_sock.close();
   };
 }
 
@@ -55,29 +75,6 @@ inherits(Manager, EventEmitter);
 
 Manager.E_READY = 'READY';
 
-Manager.prototype.start = function start() {
-  this.cli_sock_.bindSync('tcp://*:' + this.cli_port_);
-  this.cli_sock_.on('message', this.cli_sock_handler);
 
-  this.mgr_sock_.bindSync('tcp://*:' + this.mgr_port_);
-  this.mgr_sock_.on('message', this.mgr_sock_handler);
-
-  this.mdns_cli_ad_.start();
-  this.mdns_mgr_ad_.start();
-  this.mdns_browser_.start();
-
-  setTimeout(function() {
-    this.emit(Manager.E_READY);
-  }.bind(this), 0);
-};
-
-Manager.prototype.stop = function stop() {
-  this.mdns_cli_ad_.stop();
-  this.mdns_mgr_ad_.stop();
-  this.mdns_browser_.stop();
-
-  this.cli_sock_.close();
-  this.mgr_sock_.close();
-};
 
 module.exports = Manager;

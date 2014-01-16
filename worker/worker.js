@@ -2,38 +2,53 @@ var inherits = require('util').inherits;
 var EventEmitter = require('events').EventEmitter;
 var mdns = require('../common/mdns-beacon');
 var zmq = require('zmq');
+var uuid = require('uuid');
+var fs = require('fs');
 
 function Worker() {
   var worker = this;
+  var mgr_addr;
+  var sock;
+  var id;
 
-  var wkr_port = this.wkr_port_ = 9002;
+  if(!fs.existsSync('wkr_id.json')) {
+    id = uuid.v4();
+    fs.writeFileSync('wkr_id.json', wkr_id);
+  } else {
+    id = fs.readFileSync('wkr_id.json').toString();
+  }
+  id += ':' + uuid.v4();
 
-  var mdns_browser = this.mdns_browser_ = new mdns.Browser('overwatch-mgr');
+  sock = zmq.socket('req');
+  sock.identity = id;
+
+  function handle_message(data) {
+    console.log(data);
+  }
+
+  var mdns_browser = new mdns.Browser('overwatch-mgr');
   mdns_browser.on(mdns.Browser.E_SERVICE_UP, function(svc) {
-    console.log(svc);
+    mgr_addr = 'tcp://' + svc.addresses[0] + ':' + svc.port;
+    sock.connect(mgr_addr);
+    sock.on('message', handle_message);
+    sock.send('READY');
   });
 
-  var mdns_wkr_ad = this.mdns_wkr_ad_ = new mdns.Ad(wkr_port, 'overwatch-wkr');
+  this.start = function start() {
+    mdns_browser.start();
 
-  var wkr_sock = this.wkr_sock_ = zmq.socket('pull');
-  this.wkr_sock_handler = function wkr_sock_handler(msg) {
+    setTimeout(function() {
+      worker.emit(Worker.E_READY);
+    }, 0);
+  };
 
+  this.stop = function stop() {
+    mdns_browser.stop();
   };
 }
 
 inherits(Worker, EventEmitter);
 
-Worker.prototype.start = function start() {
-  this.mdns_browser_.start();
-  this.mdns_wkr_ad_.start();
-
-  this.wkr_sock_.bindSync('tcp://*:' + this.wkr_port_);
-  this.wkr_sock_.on('message', this.wkr_sock_handler);
-}
-
-Worker.prototype.stop = function stop() {
-  this.mdns_browser_.stop();
-  this.mdns_wkr_ad_.stop();
-}
+Worker.E_READY = 'READY';
 
 module.exports = Worker;

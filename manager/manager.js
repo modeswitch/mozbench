@@ -2,21 +2,29 @@ var inherits = require('util').inherits;
 var EventEmitter = require('events').EventEmitter;
 var mdns = require('../common/mdns-beacon');
 var zmq = require('zmq');
+var async = require('../common/async');
 
-function MdnsAd(port, name) {
-  var svc_t = {
-    'name': name,
-    'protocol': 'tcp'
-  };
-  var ad = mdns.createAdvertisement(svc_t, port);
-
-  this.start = function() {
-    ad.start();
+var commands = {
+  'client': {
+    'debug': {
+      'test': function(options, callback) {
+        callback({'return': 'OK'});
+      }
+    }
   }
+}
 
-  this.stop = function() {
-    ad.stop();
+function dispatch(message, manager, callback) {
+  var method = message['method'].split('.');
+  var obj = commands;
+  for(var i = 0; i < method.length; ++i) {
+    var key = method[i];
+    obj = obj[key];
+    if(undefined == obj) {
+      return callback({'error': 'dispatch failed'});
+    }
   }
+  obj.call(manager, message['options'], callback);
 }
 
 function Manager() {
@@ -34,13 +42,26 @@ function Manager() {
   var mgr_sock = zmq.socket('router');
   mgr_sock.id = 'manager';
 
-  function handle_cli_message(data) {
-    function reply(msg) {
-      cli_sock.send(JSON.stringify(msg));
-    }
+  var cli_queued = [];
 
+  function handle_cli_message(data) {
     msg = JSON.parse(data.toString());
-    reply(msg);
+    cli_queued.push(msg);
+    if(cli_queued.length == 1) {
+      async(handle_next_cli_queued_message);
+    }
+  }
+
+  function handle_next_cli_queued_message() {
+    if(cli_queued.length) {
+      var msg = cli_queued.shift();
+      dispatch(msg, manager, cli_reply);
+      async(handle_next_cli_queued_message);
+    }
+  }
+
+  function cli_reply(message) {
+    cli_sock.send(JSON.stringify(message));
   }
 
   function handle_mgr_message(envelope, delimiter, data) {
@@ -57,9 +78,9 @@ function Manager() {
     mdns_cli_ad.start();
     mdns_mgr_ad.start();
 
-    setTimeout(function() {
+    async(function() {
       manager.emit(Manager.E_READY);
-    }, 0);
+    });
   }
 
   this.stop = function stop() {

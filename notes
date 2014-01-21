@@ -1,9 +1,38 @@
-var cli_dispatcher = new client.Dispatcher();
-
-var operation = {
-  'command': 'debug',
-  'subcommand': 'noop',
-  ...
+# worker ready
+{
+  'call': 'wkr.ready',
+  'args': {
+    ...
+  }
 }
 
-cli_dispatcher(operation);
+# worker result
+{
+  'call': 'wkr.result',
+  'args': {
+    ...
+  }
+}
+
+# worker error
+{
+  'err': {
+    'type': '...',
+    'message': '...'
+  }
+}
+
+# cli command
+{
+  'call': 'cli.debug.test',
+  'args': {
+    ...
+  }
+}
+
+# msg reply
+{
+  'ret': {
+    ...
+  }
+}

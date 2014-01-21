@@ -54,8 +54,8 @@ function send_command(mgr_addr) {
 
   var params = _.omit(args, function(v, k) { return 'function' == typeof v || '@' == k[0]; });
   var cmd = {
-    method: args['@command'] + '.' + args['@subcommand'],
-    params: params
+    'method': ['client', args['@command'], args['@subcommand']].join('.'),
+    'options': params
   };
 
   var msg = JSON.stringify(cmd);

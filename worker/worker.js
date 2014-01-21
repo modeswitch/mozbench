@@ -4,6 +4,7 @@ var mdns = require('../common/mdns-beacon');
 var zmq = require('zmq');
 var uuid = require('uuid');
 var fs = require('fs');
+var async = require('../common/async');
 
 function Worker() {
   var worker = this;
@@ -37,9 +38,9 @@ function Worker() {
   this.start = function start() {
     mdns_browser.start();
 
-    setTimeout(function() {
+    async(function() {
       worker.emit(Worker.E_READY);
-    }, 0);
+    });
   };
 
   this.stop = function stop() {

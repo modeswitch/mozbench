@@ -7,46 +7,116 @@ var async = require('../common/async');
 var commands = {
   'client': {
     'debug': {
-      'test': function(options, callback) {
-        callback({'return': 'OK'});
+      'test': function() {
+        console.log(this);
+        this.reply({'return': 'OK'});
       }
+    }
+  },
+  'worker': {
+    'ready': function() {
+      console.log(this);
+      this.reply({'return': 'OK'});
     }
   }
 }
 
-function dispatch(message, manager, callback) {
-  var method = message['method'].split('.');
+function Operation(manager, handler, envelope, method, options) {
+  this.manager = manager;
+  this.handler = handler;
+  this.envelope = envelope;
+  this.options = options;
+
   var obj = commands;
   for(var i = 0; i < method.length; ++i) {
     var key = method[i];
     obj = obj[key];
     if(undefined == obj) {
-      return callback({'error': 'dispatch failed'});
+      break;
     }
   }
-  obj.call(manager, message['options'], callback);
+  if(!obj) {
+    this.method = function() {
+      var result = {'error': 'method not found: ' + method.join('.')};
+      this.reply(result);
+    }
+  } else {
+    this.method = obj;
+  }
+}
+
+Operation.prototype.call = function call() {
+  this.method.call(this, this.options);
+};
+
+Operation.prototype.reply = function reply(message) {
+  var envelope = new Buffer(this.envelope);
+  var data = new Buffer(JSON.stringify(message));
+  this.handler.send(envelope, data);
+}
+
+function Handler(manager, port) {
+  var handler = this;
+  var addr = 'tcp://*:' + port;
+  var sock = zmq.socket('router');
+  sock.id = 'manager';
+
+  var queue = [];
+
+  function queue_message(envelope, delimiter, data) {
+    var envelope = envelope.toString();
+    var message = JSON.parse(data.toString());
+    var method = message['method'].split('.');
+    var options = message['options'];
+
+    var operation = new handler.Operation(envelope, method, options);
+    queue.push(operation);
+
+    if(queue.length == 1) {
+      async(handle_next_message);
+    }
+  }
+
+  function handle_next_message() {
+    if(queue.length) {
+      var operation = queue.shift();
+      operation.call();
+      async(handle_next_message);
+    }
+  }
+
+  this.Operation = Operation.bind(undefined, manager, this);
+
+  this.send = function send(envelope, data) {
+    envelope = new Buffer(envelope);
+    data = new Buffer(data);
+    sock.send([envelope, '', data]);
+  }
+
+  this.start = function start() {
+    sock.bindSync(addr);
+    sock.on('message', queue_message);
+  };
+
+  this.stop = function stop() {
+    sock.close();
+  }
 }
 
 function Manager() {
   var manager = this;
 
-  var cli_port = 9000;
-  var cli_addr = 'tcp://*:' + cli_port;
-  var mgr_port = 9001;
-  var mgr_addr = 'tcp://*:' + mgr_port;
+  var port = 9000;
+  var handler = new Handler(this, port);
 
-  var mdns_cli_ad = new mdns.Ad(cli_port, 'overwatch-cli');
-  var mdns_mgr_ad = new mdns.Ad(mgr_port, 'overwatch-mgr');
-
-  var cli_sock = zmq.socket('rep');
-  var mgr_sock = zmq.socket('router');
-  mgr_sock.id = 'manager';
-
-  var cli_queued = [];
+  var mdns_ad = new mdns.Ad(port, 'overwatch');
 
   function handle_cli_message(data) {
-    msg = JSON.parse(data.toString());
-    cli_queued.push(msg);
+    var message = JSON.parse(data.toString());
+    cli_queued.push({
+      'envelope': null,
+      'message': message
+    });
     if(cli_queued.length == 1) {
       async(handle_next_cli_queued_message);
     }
@@ -54,29 +124,15 @@ function Manager() {
 
   function handle_next_cli_queued_message() {
     if(cli_queued.length) {
-      var msg = cli_queued.shift();
-      dispatch(msg, manager, cli_reply);
+      var queued = cli_queued.shift();
+      dispatch(queued, manager, cli_reply);
       async(handle_next_cli_queued_message);
     }
   }
 
-  function cli_reply(message) {
-    cli_sock.send(JSON.stringify(message));
-  }
-
-  function handle_mgr_message(envelope, delimiter, data) {
-    console.log(envelope.toString(), data.toString());
-  }
-
   this.start = function start() {
-    cli_sock.bindSync(cli_addr);
-    cli_sock.on('message', handle_cli_message);
-
-    mgr_sock.bindSync(mgr_addr);
-    mgr_sock.on('message', handle_mgr_message);
-
-    mdns_cli_ad.start();
-    mdns_mgr_ad.start();
+    handler.start();
+    mdns_ad.start();
 
     async(function() {
       manager.emit(Manager.E_READY);
@@ -84,11 +140,8 @@ function Manager() {
   }
 
   this.stop = function stop() {
-    mdns_cli_ad.stop();
-    mdns_mgr_ad.stop();
-
-    cli_sock.close();
-    mgr_sock.close();
+    mdns_ad.stop();
+    handler.stop();
   };
 }
 

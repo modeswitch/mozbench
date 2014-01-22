@@ -18,21 +18,23 @@ function Worker() {
   } else {
     id = fs.readFileSync('wkr_id.json').toString();
   }
-  id += ':' + uuid.v4();
 
   sock = zmq.socket('req');
   sock.identity = id;
 
   function handle_message(data) {
-    console.log(data);
+    console.log(JSON.parse(data.toString()));
   }
 
-  var mdns_browser = new mdns.Browser('overwatch-mgr');
+  var mdns_browser = new mdns.Browser('overwatch');
   mdns_browser.on(mdns.Browser.E_SERVICE_UP, function(svc) {
     mgr_addr = 'tcp://' + svc.addresses[0] + ':' + svc.port;
     sock.connect(mgr_addr);
     sock.on('message', handle_message);
-    sock.send('READY');
+    var cmd = {
+      'method': 'worker.ready'
+    }
+    sock.send(JSON.stringify(cmd));
   });
 
   this.start = function start() {

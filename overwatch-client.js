@@ -6,13 +6,14 @@ var prettyjson = require('prettyjson');
 var util = require('util');
 var parser = require('./client/cli-parser');
 var _ = require('lodash');
+var uuid = require('uuid');
 
 var args = parser.parseArgs();
 
-var client_sock;
+var sock;
 
 var svc_t = {
-  'name': 'overwatch-cli',
+  'name': 'overwatch',
   'protocol': 'tcp'
 };
 
@@ -34,7 +35,7 @@ if(args.manager) {
   browser.start();
 
   setTimeout(function() {
-    if(!client_sock) {
+    if(!sock) {
       browser.stop();
       console.error('Error: manager not found');
       process.exit(-1);
@@ -43,12 +44,13 @@ if(args.manager) {
 }
 
 function send_command(mgr_addr) {
-  client_sock = zmq.socket('req');
-  client_sock.connect(mgr_addr);
+  sock = zmq.socket('req');
+  sock.identity = uuid.v4();
+  sock.connect(mgr_addr);
 
-  client_sock.on('message', function(msg) {
-    client_sock.close();
-    var result = JSON.parse(msg.toString());
+  sock.on('message', function(data) {
+    sock.close();
+    var result = JSON.parse(data.toString());
     console.log(prettyjson.render(result));
   });
 
@@ -59,5 +61,5 @@ function send_command(mgr_addr) {
   };
 
   var msg = JSON.stringify(cmd);
-  client_sock.send(msg);
+  sock.send(msg);
 }

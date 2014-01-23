@@ -9,17 +9,33 @@ var commands = {
     'debug': {
       'test': function() {
         console.log(this);
-        this.reply({'return': 'OK'});
+        this.reply({'return': {
+          'workers': Object.keys(this.manager.workers)
+        }});
       }
     }
   },
   'worker': {
     'ready': function() {
-      console.log(this);
-      this.reply({'return': 'OK'});
+      if(!this.manager.has_worker(this.envelope)) {
+        var worker = new Worker();
+        worker.operation = this;
+        this.manager.add_worker(this.envelope, worker);
+      } else {
+        var worker = this.manager.get_worker(this.envelope);
+        worker.state = Worker.S_READY;
+      }
     }
   }
 }
+
+function Worker() {
+  this.state = Worker.S_READY;
+  this.operation = null;
+}
+
+Worker.S_READY = 'READY';
+Worker.S_WORKING = 'RUNNING';
 
 function Operation(manager, handler, envelope, method, options) {
   this.manager = manager;
@@ -142,6 +158,25 @@ function Manager() {
   this.stop = function stop() {
     mdns_ad.stop();
     handler.stop();
+  };
+
+  var workers = {};
+  this.workers = workers;
+
+  this.has_worker = function has_worker(key) {
+    return workers.hasOwnProperty(key);
+  };
+
+  this.get_worker = function get_worker(key) {
+    return workers[key];
+  };
+
+  this.add_worker = function add_worker(key, worker) {
+    workers[key] = worker;
+  };
+
+  this.remove_worker = function remove_worker(key, worker) {
+    delete workers[key];
   };
 }
 

@@ -14,7 +14,7 @@ function Worker() {
 
   if(!fs.existsSync('wkr_id.json')) {
     id = uuid.v4();
-    fs.writeFileSync('wkr_id.json', wkr_id);
+    fs.writeFileSync('wkr_id.json', id);
   } else {
     id = fs.readFileSync('wkr_id.json').toString();
   }

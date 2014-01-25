@@ -101,6 +101,7 @@ worker_remove.addArgument(
   }
 );
 
+/*
 var device = subparsers.addParser('device', {
   addHelp: true
 });
@@ -295,6 +296,7 @@ device_pool_group.addArgument(
     action: 'storeTrue'
   }
 );
+*/
 
 var queue = subparsers.addParser('queue', {
   addHelp: true
@@ -361,14 +363,28 @@ queue_add.addArgument(
   {
     type: 'int',
     help: 'number of replicates',
-    default: 30
+    defaultValue: '30'
   }
 );
 queue_add.addArgument(
-  ['device'],
+  ['platform'],
   {
     type: 'string',
-    help: 'device name'
+    help: 'platform name'
+  }
+);
+queue_add.addArgument(
+  ['browser'],
+  {
+    type: 'string',
+    help: 'browser name'
+  }
+);
+queue_add.addArgument(
+  ['channel'],
+  {
+    type: 'string',
+    help: 'channel name'
   }
 );
 queue_add.addArgument(
@@ -379,10 +395,30 @@ queue_add.addArgument(
   }
 );
 queue_add.addArgument(
-  ['browser'],
+  ['-d', '--device'],
   {
+    dest: 'device',
     type: 'string',
-    help: 'browser name'
+    help: 'device name',
+    required: true
+  }
+);
+queue_add.addArgument(
+  ['-i', '--install'],
+  {
+    dest: 'install',
+    type: 'string',
+    help: 'browser installer/package URL',
+    required: true
+  }
+);
+queue_add.addArgument(
+  ['-l', '--load'],
+  {
+    dest: 'load',
+    type: 'string',
+    help: 'benchmark URL',
+    required: true
   }
 );
 

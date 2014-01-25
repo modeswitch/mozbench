@@ -3,6 +3,8 @@ var EventEmitter = require('events').EventEmitter;
 var mdns = require('../common/mdns-beacon');
 var zmq = require('zmq');
 var async = require('../common/async');
+var uuid = require('uuid');
+var _ = require('lodash');
 
 var commands = {
   'client': {
@@ -16,48 +18,75 @@ var commands = {
     },
     'queue': {
       'add': function(options) {
-        var job = new Job(options.device, options.benchmark, options.browser);
-        var job_id = this.manager.add_job(job);
-        this.reply({'return': job_id});
+        var job = new Job(options.platform, options.benchmark, options.browser,
+          options.channel, options.install, options.load, options.device, options.replicates);
+        this.manager.add_job(job.id, job);
+        this.reply({'return': job.id});
       },
       'remove': function(options) {
-        var job_id = options.job;
-        this.manager.remove_job(job_id);
-        this.reply({});
+        var id = options.job;
+        this.manager.remove_job(id);
+        this.reply();
       },
       'info': function() {
-        this.reply({
-          'return': this.manager.jobs
-        });
+        console.log(this.manager.jobs);
+        this.reply();
+      }
+    },
+    'worker': {
+      'info': function() {
+        console.log(this.manager.workers);
+        this.reply();
       }
     }
   },
   'worker': {
     'ready': function() {
+      var worker;
       if(!this.manager.has_worker(this.envelope)) {
-        var worker = new Worker();
-        worker.operation = this;
+        worker = new Worker(this.envelope);
         this.manager.add_worker(this.envelope, worker);
       } else {
-        var worker = this.manager.get_worker(this.envelope);
+        worker = this.manager.get_worker(this.envelope);
       }
+      worker.operation = this;
+      worker.available();
+    },
+    'return': function() {
+
     }
   }
 }
 
-function Worker() {
+function Worker(id) {
+  this.id = id;
   this.device = 'x220-linux';
   this.operation = null;
+  this.task = null;
 }
 
-Worker.S_READY = 'READY';
-Worker.S_WORKING = 'RUNNING';
+inherits(Worker, EventEmitter);
 
-function Job(device, benchmark, browser, replicates) {
-  this.device = device;
+Worker.E_AVAILABLE = 'AVAILABLE';
+
+Worker.prototype.available = function available() {
+  var worker = this;
+
+  async(function() {
+    worker.emit(Worker.E_AVAILABLE);
+  });
+};
+
+function Job(platform, benchmark, browser, channel, install, load, device, replicates) {
+  var job = this;
+  this.id = uuid.v4();
+  this.platform = platform;
   this.benchmark = benchmark;
   this.browser = browser;
-  this.replicates = replicates || 30;
+  this.channel = channel;
+  this.install = install;
+  this.load = load;
+  this.device = device;
 
   // task queues
   this.waiting = {}; // waiting for a worker
@@ -67,9 +96,50 @@ function Job(device, benchmark, browser, replicates) {
   var i, task;
   for(i = 0; i < replicates; ++ i) {
     task = new Task(this, i);
+
+    task.on(Task.E_COMPLETE, function() {
+      var id = task.id;
+      delete job.pending[id];
+      job.completed[id] = task;
+    });
+
+    task.on(Task.E_ABORT, function() {
+      var id = task.id;
+      delete job.pending[id];
+      job.waiting[id] = task;
+      job.available();
+    });
+
     this.waiting[i] = task;
   }
+
+  job.available();
 }
+
+inherits(Job, EventEmitter);
+
+Job.E_AVAILABLE = 'AVAILABLE';
+
+Job.prototype.available = function available() {
+  var job = this;
+  async(function() {
+    job.emit(Job.E_AVAILABLE);
+  });
+};
+
+Job.prototype.n_waiting = function n_waiting() {
+  return Object.keys(this.waiting).length;
+};
+
+Job.prototype.get_waiting_task = function get_waiting_task() {
+  var task = _.sample(this.waiting);
+  var id = task.id;
+
+  delete this.waiting[id];
+  this.pending[id] = task;
+
+  return task;
+};
 
 function Task(job, id) {
   this.id = id;
@@ -84,30 +154,19 @@ Task.E_ABORT = 'ABORT';
 
 Task.prototype.complete = function complete(result) {
   var task = this;
-  var job = task.job;
-  var id = task.id;
 
-  // move task to the completed queue
   task.result = result;
-  delete job.pending[id];
-  job.completed[id] = task;
 
   async(function() {
-    task.emit(Task.E_COMPLETE, task);
+    task.emit(Task.E_COMPLETE);
   });
 };
 
 Task.prototype.abort = function abort() {
   var task = this;
-  var job = task.job;
-  var id = task.id;
-
-  // return task to the waiting queue
-  delete job.pending[id];
-  job.waiting[id] = task;
 
   async(function() {
-    task.emit(Task.E_ABORT, task);
+    task.emit(Task.E_ABORT);
   });
 };
 
@@ -140,6 +199,7 @@ Operation.prototype.call = function call() {
 };
 
 Operation.prototype.reply = function reply(message) {
+  message = message || {};
   var envelope = new Buffer(this.envelope);
   var data = new Buffer(JSON.stringify(message));
   this.handler.send(envelope, data);
@@ -236,7 +296,29 @@ function Manager() {
     handler.stop();
   };
 
+  function find_workers_for_job(job, limit) {
+    var device = job.device;
+    var possible_workers = workers_by_device[device];
+    if(_.size(possible_workers)) {
+      return _.sample(Object.keys(possible_workers), limit);
+    } else {
+      return [];
+    }
+  }
+
+  function find_job_for_worker(worker) {
+    var device = worker.device;
+    var possible_jobs = jobs_by_device[device];
+    if(_.size(possible_jobs)) {
+      return _.sample(Object.keys(possible_jobs));
+    } else {
+      return null;
+    }
+  }
+
   var workers = {};
+  var workers_by_device = {};
+  var available_workers = {};
   this.workers = workers;
 
   this.has_worker = function has_worker(key) {
@@ -248,16 +330,48 @@ function Manager() {
   };
 
   this.add_worker = function add_worker(key, worker) {
+    console.log('adding worker %s', worker.id);
     workers[key] = worker;
+    var device = worker.device;
+    if(!workers_by_device.hasOwnProperty(device)) {
+      workers_by_device[device] = {};
+    }
+    workers_by_device[device][key] = worker;
+
+    worker.on(Worker.E_AVAILABLE, function() {
+      console.log('worker %s available', worker.id);
+      var job_id = find_job_for_worker(worker);
+      if(job_id) {
+        console.log('assigning %s to %s', job_id, worker.id)
+        var job = jobs[job_id];
+        var task = job.get_waiting_task();
+        worker.operation.reply({
+          job: job.id,
+          task: task.id,
+          install: job.install,
+          load: job.load
+        });
+      } else {
+        console.log('no job for worker %s', worker.id);
+        available_workers[worker.id] = worker;
+      }
+    });
   };
 
-  this.remove_worker = function remove_worker(key, worker) {
-    delete workers[key];
+  this.remove_worker = function remove_worker(key) {
+    var worker = workers[key];
+    if(worker) {
+      var device = worker.device;
+      delete workers[key];
+      delete workers_by_device[device][key];
+      delete available_workers[key];
+      worker.removeAllListeners();
+    }
   };
 
   var jobs = {};
+  var jobs_by_device = {};
   this.jobs = jobs;
-  var next_job_id = 1;
 
   this.has_job = function has_job(key) {
     return jobs.hasOwnProperty(key);
@@ -267,14 +381,32 @@ function Manager() {
     return jobs[key];
   };
 
-  this.add_job = function add_job(job) {
-    var key = next_job_id ++;
+  this.add_job = function add_job(key, job) {
+    console.log('adding job %s', job.id);
     jobs[key] = job;
-    return key;
+    var device = job.device;
+    if(!jobs_by_device.hasOwnProperty(device)) {
+      jobs_by_device[device] = {};
+    }
+    jobs_by_device[device][key] = job;
+
+    job.on(Job.E_AVAILABLE, function() {
+      console.log('job %s is available', job.id);
+      var workers = find_workers_for_job(job, job.n_waiting());
+      workers.forEach(function(worker) {
+        // claim task
+        // do reply
+      });
+    });
   };
 
   this.remove_job = function remove_job(key) {
-    delete jobs[key];
+    var job = jobs[key];
+    if(job) {
+      var device = job.device;
+      delete jobs[key];
+      delete jobs_by_device[device][key];
+    }
   };
 }
 

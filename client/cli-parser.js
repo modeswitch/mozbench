@@ -357,6 +357,14 @@ queue_add = queue_subparsers.addParser('add', {
   addHelp: true
 });
 queue_add.addArgument(
+  ['-r', '--replicates'],
+  {
+    type: 'int',
+    help: 'number of replicates',
+    default: 30
+  }
+);
+queue_add.addArgument(
   ['device'],
   {
     type: 'string',

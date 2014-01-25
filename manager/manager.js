@@ -8,10 +8,27 @@ var commands = {
   'client': {
     'debug': {
       'test': function() {
-        console.log(this);
         this.reply({'return': {
-          'workers': Object.keys(this.manager.workers)
+          'workers': Object.keys(this.manager.workers),
+          'jobs': Object.keys(this.manager.jobs)
         }});
+      }
+    },
+    'queue': {
+      'add': function(options) {
+        var job = new Job(options.device, options.benchmark, options.browser);
+        var job_id = this.manager.add_job(job);
+        this.reply({'return': job_id});
+      },
+      'remove': function(options) {
+        var job_id = options.job;
+        this.manager.remove_job(job_id);
+        this.reply({});
+      },
+      'info': function() {
+        this.reply({
+          'return': this.manager.jobs
+        });
       }
     }
   },
@@ -23,25 +40,82 @@ var commands = {
         this.manager.add_worker(this.envelope, worker);
       } else {
         var worker = this.manager.get_worker(this.envelope);
-        worker.state = Worker.S_READY;
       }
     }
   }
 }
 
 function Worker() {
-  this.state = Worker.S_READY;
+  this.device = 'x220-linux';
   this.operation = null;
 }
 
 Worker.S_READY = 'READY';
 Worker.S_WORKING = 'RUNNING';
 
+function Job(device, benchmark, browser, replicates) {
+  this.device = device;
+  this.benchmark = benchmark;
+  this.browser = browser;
+  this.replicates = replicates || 30;
+
+  // task queues
+  this.waiting = {}; // waiting for a worker
+  this.pending = {}; // assigned to a worker, awaiting result
+  this.completed = {}; // result received
+
+  var i, task;
+  for(i = 0; i < replicates; ++ i) {
+    task = new Task(this, i);
+    this.waiting[i] = task;
+  }
+}
+
+function Task(job, id) {
+  this.id = id;
+  this.job = job;
+  this.result = null;
+}
+
+inherits(Task, EventEmitter);
+
+Task.E_COMPLETE = 'COMPLETE';
+Task.E_ABORT = 'ABORT';
+
+Task.prototype.complete = function complete(result) {
+  var task = this;
+  var job = task.job;
+  var id = task.id;
+
+  // move task to the completed queue
+  task.result = result;
+  delete job.pending[id];
+  job.completed[id] = task;
+
+  async(function() {
+    task.emit(Task.E_COMPLETE, task);
+  });
+};
+
+Task.prototype.abort = function abort() {
+  var task = this;
+  var job = task.job;
+  var id = task.id;
+
+  // return task to the waiting queue
+  delete job.pending[id];
+  job.waiting[id] = task;
+
+  async(function() {
+    task.emit(Task.E_ABORT, task);
+  });
+};
+
 function Operation(manager, handler, envelope, method, options) {
   this.manager = manager;
   this.handler = handler;
   this.envelope = envelope;
-  this.options = options;
+  this.options = options || {};
 
   var obj = commands;
   for(var i = 0; i < method.length; ++i) {
@@ -110,11 +184,13 @@ function Handler(manager, port) {
   }
 
   this.start = function start() {
+    sock.monitor();
     sock.bindSync(addr);
     sock.on('message', queue_message);
   };
 
   this.stop = function stop() {
+    sock.unmonitor();
     sock.close();
   }
 }
@@ -177,6 +253,28 @@ function Manager() {
 
   this.remove_worker = function remove_worker(key, worker) {
     delete workers[key];
+  };
+
+  var jobs = {};
+  this.jobs = jobs;
+  var next_job_id = 1;
+
+  this.has_job = function has_job(key) {
+    return jobs.hasOwnProperty(key);
+  };
+
+  this.get_job = function get_job(key) {
+    return jobs[key];
+  };
+
+  this.add_job = function add_job(job) {
+    var key = next_job_id ++;
+    jobs[key] = job;
+    return key;
+  };
+
+  this.remove_job = function remove_job(key) {
+    delete jobs[key];
   };
 }
 

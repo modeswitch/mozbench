@@ -6,6 +6,10 @@ var uuid = require('uuid');
 var fs = require('fs');
 var async = require('../common/async');
 
+var tasks = {
+
+};
+
 function Worker() {
   var worker = this;
   var mgr_addr;

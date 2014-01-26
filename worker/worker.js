@@ -5,9 +5,32 @@ var zmq = require('zmq');
 var uuid = require('uuid');
 var fs = require('fs');
 var async = require('../common/async');
+var http = require('http');
 
-var tasks = {
+var commands = {
+  'worker': {
+    'run': function(options) {
+      setTimeout(function() {
+        var req = http.request({
+          port: 8080,
+          hostname: '127.0.0.1',
+          method: 'POST'
+        }, function(res) {
 
+        });
+        req.write(JSON.stringify({
+          'value': 0
+        }));
+        req.end();
+      }, 5 * 1000);
+    },
+    'done': function() {
+      var cmd = {
+        'method': 'worker.ready'
+      };
+      this.send(cmd);
+    }
+  }
 };
 
 function Worker() {
@@ -27,11 +50,28 @@ function Worker() {
   sock.identity = id;
 
   function handle_message(data) {
-    console.log(JSON.parse(data.toString()));
+    var message = JSON.parse(data.toString());
+    var method = message['method'].split('.');
+    var options = message['options'];
+
+    var obj = commands;
+    for(var i = 0; i < method.length; ++i) {
+      var key = method[i];
+      obj = obj[key];
+      if(undefined == obj) {
+        break;
+      }
+    }
+    if(!obj) {
+      return;
+    }
+
+    obj.call(worker, options);
   }
 
   var mdns_browser = new mdns.Browser('overwatch');
   mdns_browser.on(mdns.Browser.E_SERVICE_UP, function(svc) {
+    mdns_browser.stop();
     mgr_addr = 'tcp://' + svc.addresses[0] + ':' + svc.port;
     sock.connect(mgr_addr);
     sock.on('message', handle_message);
@@ -41,8 +81,31 @@ function Worker() {
     sock.send(JSON.stringify(cmd));
   });
 
+  function http_handler(req, res) {
+    var buffer = '';
+    req.on('data', function(chunk) {
+      buffer += chunk;
+    });
+    req.on('end', function(chunk) {
+      if(chunk) {
+        buffer += chunk;
+      }
+      res.writeHead(200);
+      res.end();
+
+      var cmd = {
+        'method': 'worker.result',
+        'options': buffer
+      };
+      sock.send(JSON.stringify(cmd));
+    });
+  }
+
+  var http_server = http.createServer(http_handler);
+
   this.start = function start() {
     mdns_browser.start();
+    http_server.listen(8080, '127.0.0.1');
 
     async(function() {
       worker.emit(Worker.E_READY);
@@ -51,6 +114,11 @@ function Worker() {
 
   this.stop = function stop() {
     mdns_browser.stop();
+    http_server.close();
+  };
+
+  this.send = function send(message) {
+    sock.send(JSON.stringify(message));
   };
 }
 

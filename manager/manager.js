@@ -52,8 +52,11 @@ var commands = {
       worker.operation = this;
       worker.available();
     },
-    'return': function() {
-
+    'result': function() {
+      console.log(this.options);
+      this.reply({
+        'method': 'worker.done'
+      });
     }
   }
 }
@@ -101,6 +104,9 @@ function Job(platform, benchmark, browser, channel, install, load, device, repli
       var id = task.id;
       delete job.pending[id];
       job.completed[id] = task;
+      if(!_.size(job.waiting) && _.size(job.pending)) {
+        job.complete();
+      }
     });
 
     task.on(Task.E_ABORT, function() {
@@ -119,6 +125,7 @@ function Job(platform, benchmark, browser, channel, install, load, device, repli
 inherits(Job, EventEmitter);
 
 Job.E_AVAILABLE = 'AVAILABLE';
+Job.E_COMPLETE = 'COMPLETE';
 
 Job.prototype.available = function available() {
   var job = this;
@@ -127,11 +134,21 @@ Job.prototype.available = function available() {
   });
 };
 
+Job.prototype.complete = function complete() {
+  var job = this;
+  async(function() {
+    job.emit(Job.E_COMPLETE);
+  });
+};
+
 Job.prototype.n_waiting = function n_waiting() {
-  return Object.keys(this.waiting).length;
+  return _.size(this.waiting);
 };
 
 Job.prototype.get_waiting_task = function get_waiting_task() {
+  if(!_.size(this.waiting)) {
+    return null;
+  }
   var task = _.sample(this.waiting);
   var id = task.id;
 
@@ -300,7 +317,7 @@ function Manager() {
     var device = job.device;
     var possible_workers = workers_by_device[device];
     if(_.size(possible_workers)) {
-      return _.sample(Object.keys(possible_workers), limit);
+      return _.sample(possible_workers, limit);
     } else {
       return [];
     }
@@ -309,11 +326,10 @@ function Manager() {
   function find_job_for_worker(worker) {
     var device = worker.device;
     var possible_jobs = jobs_by_device[device];
-    if(_.size(possible_jobs)) {
-      return _.sample(Object.keys(possible_jobs));
-    } else {
-      return null;
-    }
+    var job = _.find(possible_jobs, function(job) {
+      return job.n_waiting();
+    });
+    return job;
   }
 
   var workers = {};
@@ -340,17 +356,21 @@ function Manager() {
 
     worker.on(Worker.E_AVAILABLE, function() {
       console.log('worker %s available', worker.id);
-      var job_id = find_job_for_worker(worker);
-      if(job_id) {
-        console.log('assigning %s to %s', job_id, worker.id)
-        var job = jobs[job_id];
+      var job = find_job_for_worker(worker);
+      if(job && job.n_waiting()) {
+        console.log('assigning %s to %s', job.id, worker.id);
         var task = job.get_waiting_task();
-        worker.operation.reply({
-          job: job.id,
-          task: task.id,
-          install: job.install,
-          load: job.load
-        });
+        if(task) {
+          worker.operation.reply({
+            method: 'worker.run',
+            options: {
+              job: job.id,
+              task: task.id,
+              install: job.install,
+              load: job.load
+            }
+          });
+        }
       } else {
         console.log('no job for worker %s', worker.id);
         available_workers[worker.id] = worker;
@@ -392,11 +412,25 @@ function Manager() {
 
     job.on(Job.E_AVAILABLE, function() {
       console.log('job %s is available', job.id);
-      var workers = find_workers_for_job(job, job.n_waiting());
-      workers.forEach(function(worker) {
-        // claim task
-        // do reply
+      var found_workers = find_workers_for_job(job, job.n_waiting());
+      found_workers.forEach(function(worker) {
+        console.log('assigning %s to %s', job.id, worker.id);
+        var task = job.get_waiting_task();
+        worker.operation.reply({
+          method: 'worker.run',
+          options: {
+            job: job.id,
+            task: task.id,
+            install: job.install,
+            load: job.load
+          }
+        });
       });
+    });
+
+    job.on(Job.E_COMPLETE, function() {
+      console.log('job %s is complete', job.id);
+      manager.remove_job(job.id);
     });
   };
 
@@ -406,6 +440,7 @@ function Manager() {
       var device = job.device;
       delete jobs[key];
       delete jobs_by_device[device][key];
+      job.removeAllListeners();
     }
   };
 }

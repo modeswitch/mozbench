@@ -7,9 +7,21 @@ var fs = require('fs');
 var async = require('../common/async');
 var http = require('http');
 
+function download_installer(url, callback) {
+
+}
+
+function install_browser(installer_path, browser_path) {
+
+}
+
 var commands = {
   'worker': {
     'run': function(options) {
+      console.log('run:', options);
+      this.task = options;
+
+      // debug
       setTimeout(function() {
         var req = http.request({
           port: 8080,
@@ -19,12 +31,14 @@ var commands = {
 
         });
         req.write(JSON.stringify({
-          'value': 0
+          'score': 0
         }));
         req.end();
       }, 5 * 1000);
     },
-    'done': function() {
+    'complete': function() {
+      this.task = null;
+
       var cmd = {
         'method': 'worker.ready'
       };
@@ -38,6 +52,8 @@ function Worker() {
   var mgr_addr;
   var sock;
   var id;
+
+  this.task = null;
 
   if(!fs.existsSync('wkr_id.json')) {
     id = uuid.v4();
@@ -95,7 +111,11 @@ function Worker() {
 
       var cmd = {
         'method': 'worker.result',
-        'options': buffer
+        'options': {
+          'job': worker.task.job,
+          'task': worker.task.task,
+          'value': JSON.parse(buffer)
+        }
       };
       sock.send(JSON.stringify(cmd));
     });

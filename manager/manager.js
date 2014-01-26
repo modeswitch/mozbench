@@ -55,7 +55,7 @@ var commands = {
     'result': function() {
       console.log(this.options);
       this.reply({
-        'method': 'worker.done'
+        'method': 'worker.complete'
       });
     }
   }

@@ -6,46 +6,125 @@ var uuid = require('uuid');
 var fs = require('fs');
 var async = require('../common/async');
 var http = require('http');
+var crypto = require('crypto');
+var path = require('path');
+var spawn = require('child_process').spawn;
+var exec = require('child_process').exec;
+
+var tmp_dir = '/tmp';
+var install_dir = '/tmp';
 
 function download_installer(url, callback) {
+  var package_path = tmp_dir + '/' + path.basename(url);
 
+  if(fs.existsSync(package_path)) {
+    return callback(package_path);
+  }
+
+  var fd = fs.openSync(package_path, 'w+');
+
+  var size = 0;
+  var req = http.request(url, function(res) {
+    res.on('data', function(chunk) {
+      fs.appendFileSync(package_path, chunk, {encoding: 'binary'});
+      size += chunk.length;
+    });
+    res.on('end', function(chunk) {
+      if(chunk) {
+        fs.appendFileSync(package_path, chunk, {encoding: 'binary'});
+        size += chunk.length;
+      }
+      callback(package_path);
+    });
+    res.on('error', function(err) {
+      console.error('error', err);
+      fs.unlinkSync(package_path);
+    });
+  }).end();
 }
 
-function install_browser(installer_path, browser_path) {
+function install_package(package_path, install_path, callback) {
+  if(fs.existsSync(install_path)) {
+    return callback(install_path);
+  }
 
+  if(!fs.existsSync(install_path)) {
+    fs.mkdirSync(install_path);
+  }
+
+  var child;
+
+  child = spawn('tar', ['xjf', package_path, '-C', install_path]);
+  child.stdout.on('data', function(chunk) {
+    process.stdout.write(chunk);
+  });
+  child.stderr.on('data', function(chunk) {
+    process.stderr.write(chunk);
+  });
+  child.on('exit', function(code, signal) {
+    if(0 == code) {
+      create_profile();
+    } else {
+      fs.rmdirSync(install_path);
+      // abort
+    }
+  });
+
+  function create_profile() {
+    var bin_path = install_path + '/firefox/firefox';
+    var child = exec(bin_path + ' -CreateProfile benchmark');
+    child.on('exit', function(code, signal) {
+      callback(install_path);
+    });
+  }
 }
 
 var commands = {
   'worker': {
     'run': function(options) {
-      console.log('run:', options);
-      this.task = options;
+      var worker = this;
+      worker.task = new Task(options);
 
-      // debug
-      setTimeout(function() {
-        var req = http.request({
-          port: 8080,
-          hostname: '127.0.0.1',
-          method: 'POST'
-        }, function(res) {
+      download_installer(options.install, do_install);
 
+      function do_install(package_path) {
+        var md5sum = crypto.createHash('md5');
+        md5sum.update(options.install);
+        var install_path = install_dir + '/' + md5sum.digest('hex');
+        install_package(package_path, install_path, run_benchmark);
+      }
+
+      function run_benchmark(install_path) {
+        var bin_path = install_path + '/firefox/firefox';
+        var child = spawn(bin_path, ['-no-remote', '-P', 'benchmark', options.load]);
+        child.on('exit', function(code, signal) {
+          console.log('exit', code, signal);
+          // do something
         });
-        req.write(JSON.stringify({
-          'score': 0
-        }));
-        req.end();
-      }, 5 * 1000);
+        worker.task.child = child;
+      }
     },
     'complete': function() {
-      this.task = null;
+      var worker = this;
+      this.task.child.kill('SIGINT');
+      this.task.child.on('exit', function() {
+        worker.task = null;
 
-      var cmd = {
-        'method': 'worker.ready'
-      };
-      this.send(cmd);
+        setTimeout(function() {
+          var cmd = {
+            'method': 'worker.ready'
+          };
+          worker.send(cmd);
+        }, 5000);
+      });
     }
   }
 };
+
+function Task(options) {
+  this.options = options;
+  this.child = null;
+}
 
 function Worker() {
   var worker = this;
@@ -112,8 +191,8 @@ function Worker() {
       var cmd = {
         'method': 'worker.result',
         'options': {
-          'job': worker.task.job,
-          'task': worker.task.task,
+          'job': worker.task.options.job,
+          'task': worker.task.options.task,
           'value': JSON.parse(buffer)
         }
       };

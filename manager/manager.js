@@ -61,24 +61,7 @@ var commands = {
   }
 }
 
-function Worker(id) {
-  this.id = id;
-  this.device = 'x220-linux';
-  this.operation = null;
-  this.task = null;
-}
-
-inherits(Worker, EventEmitter);
-
-Worker.E_AVAILABLE = 'AVAILABLE';
-
-Worker.prototype.available = function available() {
-  var worker = this;
-
-  async(function() {
-    worker.emit(Worker.E_AVAILABLE);
-  });
-};
+var Worker = require('./worker');
 
 function Job(platform, benchmark, browser, channel, install, load, device, replicates) {
   var job = this;

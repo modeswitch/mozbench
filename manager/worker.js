@@ -5,19 +5,19 @@ var async = require('../common/async');
 function Worker(id) {
   this.id = id;
   this.device = 'x220-linux';
-  this.operation = null;
+  this.callback = null;
   this.task = null;
 }
 
 inherits(Worker, EventEmitter);
 
-Worker.E_AVAILABLE = 'AVAILABLE';
+Worker.E_READY = 'E_READY';
 
-Worker.prototype.available = function available() {
+Worker.prototype.ready = function ready() {
   var worker = this;
 
   async(function() {
-    worker.emit(Worker.E_AVAILABLE);
+    worker.emit(Worker.E_READY);
   });
 };
 

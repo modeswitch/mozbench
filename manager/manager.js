@@ -2,9 +2,11 @@ var inherits = require('util').inherits;
 var EventEmitter = require('events').EventEmitter;
 var mdns = require('../common/mdns-beacon');
 var zmq = require('zmq');
-var async = require('../common/async');
 var uuid = require('uuid');
 var _ = require('lodash');
+
+var async = require('../common/async');
+var Worker = require('./worker');
 
 var commands = {
   'client': {
@@ -61,8 +63,6 @@ var commands = {
   }
 }
 
-var Worker = require('./worker');
-
 function Job(platform, benchmark, browser, channel, install, load, device, replicates) {
   var job = this;
   this.id = uuid.v4();
@@ -73,6 +73,8 @@ function Job(platform, benchmark, browser, channel, install, load, device, repli
   this.install = install;
   this.load = load;
   this.device = device;
+
+  this.timestamp = Math.round(+new Date()/1000);
 
   // task queues
   this.waiting = {}; // waiting for a worker

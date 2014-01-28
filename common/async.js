@@ -1,5 +1,5 @@
 function queue(cb) {
-  setTimeout(cb, 0);
+  process.nextTick(cb);
 }
 
 module.exports = queue;

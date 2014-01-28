@@ -1,8 +1,8 @@
 process.env['AVAHI_COMPAT_NOWARN'] = 1;
 
-var Manager = require('./manager/manager');
+var Manager = require('./manager/manager2');
 
-var mgr = new Manager();
+var mgr = new Manager(9000);
 mgr.start();
 
 process.on('SIGINT', shutdown);

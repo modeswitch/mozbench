@@ -4,27 +4,30 @@ var async = require('../common/async');
 var Job = require('./job');
 
 var handlers = {
-  'queue': {
-    'add': function(sender, options, callback) {
-      var dispatcher = this;
-      var conditions = {
-        'replicates': options.replicates
-      };
-      var job = new Job(dispatcher.manager.next_id(), options.platform, options.benchmark,
-        options.browser, options.channel, options.install, options.load, options.device, conditions);
-      async(function() {
-        dispatcher.emit(Dispatcher.E_JOB, job);
-      });
-      callback({
-        'return': job.id()
-      });
+  'client': {
+    'queue': {
+      'add': function(sender, options, callback) {
+        var dispatcher = this;
+        var conditions = {
+          'replicates': options.replicates
+        };
+        var id = dispatcher.manager.next_id();
+        var job = new Job(id, options.platform, options.benchmark,
+          options.browser, options.channel, options.install, options.load, options.device, conditions);
+        async(function() {
+          dispatcher.emit(Dispatcher.E_JOB, job);
+        });
+        callback({
+          'id': job.id
+        });
+      }
     }
   },
   'worker': {
     'ready': function(sender, options, callback) {
       var dispatcher = this;
       var worker_id = options.sender;
-      var worker = dispatcher.manager.find_worker(worker_id);
+      var worker = dispatcher.manager().find_worker(worker_id);
       if(!worker) {
         var worker = new Worker(dispatcher.manager.next_id());
         async(function() {
@@ -40,11 +43,12 @@ var handlers = {
   }
 };
 
-function default_handler(options, callback) {
+function default_handler(sender, options, callback) {
   callback({'error': 'method not found: ' + options.method});
 }
 
 function Operation(dispatcher, message) {
+  var operation = this;
   var handler = handlers;
   var options = message.data.options || {};
   var sender = message.data.sender || null;
@@ -59,6 +63,7 @@ function Operation(dispatcher, message) {
   }
 
   if(!handler) {
+    options = {method: message.data.method};
     handler = default_handler;
   }
 
@@ -81,16 +86,18 @@ function Dispatcher(manager) {
   }
 
   this.queue = function queue(message) {
-    if(0 == queue.length) {
+    if(0 == queued_messages.length) {
       async(handle_next_queued_message);
     }
 
     queued_messages.push(message);
   }
 
-  this.manager = function manager() {
-    return manager;
-  };
+  Object.defineProperty(this, 'manager', {
+    'get': function() {
+      return manager;
+    }
+  });
 }
 
 inherits(Dispatcher, EventEmitter);

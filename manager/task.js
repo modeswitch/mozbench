@@ -3,16 +3,20 @@ var EventEmitter = require('events').EventEmitter;
 var async = require('../common/async');
 
 function Task(id, job) {
+  id = job.id + ':' + String(id);
   var task = this;
   var result = null;
 
-  this.id = function id() {
-    return id;
-  };
-
-  this.job = function job() {
-    return job;
-  };
+  Object.defineProperty(this, 'id', {
+    'get': function() {
+      return id;
+    }
+  });
+  Object.defineProperty(this, 'job', {
+    'get': function() {
+      return job;
+    }
+  });
 
   this.complete = function complete(value) {
     if(undefined == value) {
@@ -22,7 +26,7 @@ function Task(id, job) {
 
     async(function() {
       task.emit(Task.E_COMPLETE);
-    };
+    });
   };
 
   this.retry = function retry() {

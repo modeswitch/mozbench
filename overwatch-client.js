@@ -7,35 +7,34 @@ var util = require('util');
 var parser = require('./client/cli-parser');
 var _ = require('lodash');
 var uuid = require('uuid');
+var http = require('http');
 
 var args = parser.parseArgs();
-
-var sock;
 
 var svc_t = {
   'name': 'overwatch',
   'protocol': 'tcp'
 };
 
-if(args.manager) {
-  var mgr_addr = 'tcp://' + args.manager;
+var mgr_host;
+var mgr_port;
 
-  send_command(mgr_addr);
+if(args.manager) {
+
 } else {
   var browser = new mdns.Browser(svc_t);
   browser.on('serviceUp', function(svc_inst) {
     browser.stop();
 
-    var mgr_host = svc_inst.host;
-    var mgr_port = svc_inst.port;
-    var mgr_addr = 'tcp://' + mgr_host + ':' + mgr_port;
+    mgr_host = svc_inst.host;
+    mgr_port = svc_inst.port;
 
-    send_command(mgr_addr);
+    send_command(mgr_host, mgr_port);
   });
   browser.start();
 
   setTimeout(function() {
-    if(!sock) {
+    if(!(mgr_host && mgr_port)) {
       browser.stop();
       console.error('Error: manager not found');
       process.exit(-1);
@@ -43,23 +42,35 @@ if(args.manager) {
   }, 1000);
 }
 
-function send_command(mgr_addr) {
-  sock = zmq.socket('req');
-  sock.identity = uuid.v4();
-  sock.connect(mgr_addr);
-
-  sock.on('message', function(data) {
-    sock.close();
-    var result = JSON.parse(data.toString());
-    console.log(prettyjson.render(result));
-  });
-
+function send_command(mgr_host, mgr_port) {
   var params = _.omit(args, function(v, k) { return 'function' == typeof v || '@' == k[0]; });
   var cmd = {
     'method': ['client', args['@command'], args['@subcommand']].join('.'),
     'options': params
   };
 
-  var msg = JSON.stringify(cmd);
-  sock.send(msg);
+  var opts = {
+    hostname: mgr_host,
+    port: mgr_port,
+    method: 'post'
+  };
+  var req = http.request(opts, function(res) {
+    var data = '';
+    res.on('data', function(chunk) {
+      data += chunk;
+    });
+    res.on('end', function(chunk) {
+      if(chunk) {
+        data += chunk;
+      }
+      console.log(JSON.parse(data));
+    })
+  });
+  req.setHeader('Content-Type', 'application/json');
+  req.write(JSON.stringify(cmd));
+  req.end();
+
+  req.on('error', function(err) {
+    console.error('error:', err);
+  });
 }

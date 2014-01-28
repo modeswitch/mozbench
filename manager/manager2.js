@@ -15,12 +15,21 @@ function Manager(port) {
   var mdns_ad = new mdns.Ad(port, 'overwatch');
 
   var jobs = {};
+  var available_tasks = {};
+
   var workers = {};
+  var available_workers = {};
 
   var dispatcher = new Dispatcher(manager);
   dispatcher.on(Dispatcher.E_JOB, function(job) {
+    console.log('new job:', job.id);
     job.on(Job.E_TASK, function(task) {
-
+      console.log('new task:', task.id);
+      var device = job.device;
+      if(!available_tasks.hasOwnProperty(device)) {
+        available_tasks[device] = {};
+      }
+      available_tasks[device][task.id] = task;
     });
     job.on(Job.E_COMPLETE, function() {
 
@@ -28,7 +37,7 @@ function Manager(port) {
     job.on(Job.E_ABORT, function() {
 
     });
-    jobs[job.id()] = job;
+    jobs[job.id] = job;
   });
   dispatcher.on(Dispatcher.E_WORKER, function(worker) {
     worker.on(Worker.E_READY, function() {
@@ -42,9 +51,9 @@ function Manager(port) {
     dispatcher.queue(message);
   });
 
-  var next_id = 1;
+  var next_id_ = 1;
   this.next_id = function next_id() {
-    return next_id ++;
+    return next_id_ ++;
   };
 
   this.start = function start() {

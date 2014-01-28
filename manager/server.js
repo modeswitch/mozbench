@@ -1,20 +1,24 @@
 var inherits = require('util').inherits;
 var EventEmitter = require('events').EventEmitter;
 var http = require('http');
+var async = require('../common/async');
 
 function Message(response, data) {
   this.data = data;
 
   this.reply = function reply(message) {
     message = JSON.stringify(message);
-    response.writeHead(200);
+
     response.setHeader('Content-Type', 'application/json');
+    response.writeHead(200);
     response.write(message);
     response.end();
   };
 }
 
 function Server(port) {
+  var server = this;
+
   function request_handler(req, res) {
     var data = '';
     req.on('data', function(chunk) {
@@ -24,13 +28,12 @@ function Server(port) {
       if(chunk) {
         data += chunk;
       }
-
       var json = JSON.parse(data);
       var message = new Message(res, json);
 
       async(function() {
-        this.emit(Server.E_CALL, message);
-      }.bind(this));
+        server.emit(Server.E_CALL, message);
+      });
     })
   }
 

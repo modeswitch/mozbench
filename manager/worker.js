@@ -6,7 +6,6 @@ function Worker(id) {
   this.id = id;
   this.device = 'x220-linux';
   this.callback = null;
-  this.task = null;
 }
 
 inherits(Worker, EventEmitter);

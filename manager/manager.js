@@ -4,7 +4,6 @@ var http = require('http');
 var _ = require('lodash');
 
 var async = require('../common/async');
-// var mdns = require('../common/mdns-beacon');
 var Discover = require('../common/discover');
 var Server = require('./server');
 var Worker = require('./worker');

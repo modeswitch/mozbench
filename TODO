@@ -1,3 +1,4 @@
+* support different devices (un-hardcode)
 * installer should recognize file types (e.g., .tar.gz) and unpack them accordingly
 * installers needed for other platforms/package types
 * manager should persist in-memory data structures to disk and load them on startup

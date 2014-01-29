@@ -1,7 +1,6 @@
 process.env['AVAHI_COMPAT_NOWARN'] = 1;
 
 var Discover = require('./common/discover');
-var zmq = require('zmq');
 var prettyjson = require('prettyjson');
 var util = require('util');
 var parser = require('./client/cli-parser');

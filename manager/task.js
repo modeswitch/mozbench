@@ -3,7 +3,7 @@ var EventEmitter = require('events').EventEmitter;
 var async = require('../common/async');
 
 function Task(id, job) {
-  id = job.id + ':' + String(id);
+  id = String(id);
   var task = this;
   var result = null;
 
@@ -15,6 +15,11 @@ function Task(id, job) {
   Object.defineProperty(this, 'job', {
     'get': function() {
       return job;
+    }
+  });
+  Object.defineProperty(this, 'result', {
+    'get': function() {
+      return result;
     }
   });
 
@@ -44,6 +49,8 @@ function Task(id, job) {
       task.emit(Task.E_ABORT);
     });
   };
+
+  this.worker = null;
 }
 
 inherits(Task, EventEmitter);

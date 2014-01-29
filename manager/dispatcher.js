@@ -2,6 +2,7 @@ var inherits = require('util').inherits;
 var EventEmitter = require('events').EventEmitter;
 var async = require('../common/async');
 var Job = require('./job');
+var Worker = require('./worker');
 
 var handlers = {
   'client': {
@@ -26,19 +27,24 @@ var handlers = {
   'worker': {
     'ready': function(sender, options, callback) {
       var dispatcher = this;
-      var worker_id = options.sender;
-      var worker = dispatcher.manager().find_worker(worker_id);
+      var worker = dispatcher.manager.find_worker(sender);
       if(!worker) {
-        var worker = new Worker(dispatcher.manager.next_id());
+        var worker = new Worker(sender);
         async(function() {
           dispatcher.emit(Dispatcher.E_WORKER, worker);
         });
       } else {
-        async(function() {
-          worker.ready();
-        });
+        worker.ready();
       }
       worker.callback = callback;
+    },
+    'result': function(sender, options, callback) {
+      console.log('result:', options);
+      var dispatcher = this;
+      var worker = dispatcher.manager.find_worker(options.worker);
+      worker.task.complete(options.result);
+      worker.ready();
+      callback({});
     }
   }
 };
@@ -72,6 +78,12 @@ function Operation(dispatcher, message) {
   this.call = function call(context) {
     handler.call(context, sender, options, operation.reply);
   };
+
+/*
+  message.on(Message.E_DISCONNECT, function() {
+    console.error('client disconnected');
+  });
+*/
 }
 
 function Dispatcher(manager) {

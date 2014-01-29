@@ -4,6 +4,7 @@ var http = require('http');
 var async = require('../common/async');
 
 function Message(response, data) {
+  var message = this;
   this.data = data;
 
   this.reply = function reply(message) {
@@ -14,7 +15,16 @@ function Message(response, data) {
     response.write(message);
     response.end();
   };
+/*
+  response.on('close', function() {
+    async(function() {
+      message.emit(Message.E_DISCONNECT);
+    });
+  });
+*/
 }
+
+inherits(Server, EventEmitter);
 
 function Server(port) {
   var server = this;
@@ -34,7 +44,7 @@ function Server(port) {
       async(function() {
         server.emit(Server.E_CALL, message);
       });
-    })
+    });
   }
 
   var http_server = http.createServer(request_handler);
@@ -52,5 +62,6 @@ function Server(port) {
 inherits(Server, EventEmitter);
 
 Server.E_CALL = 'CALL';
+Server.E_DISCONNECT = 'DISCONNECT';
 
 module.exports = Server;

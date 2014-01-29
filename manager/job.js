@@ -29,6 +29,16 @@ function Job(id, platform, benchmark, browser, channel, install, load, device, c
       return device;
     }
   });
+  Object.defineProperty(this, 'install', {
+    'get': function() {
+      return install;
+    }
+  });
+  Object.defineProperty(this, 'load', {
+    'get': function() {
+      return load;
+    }
+  });
 
   if(conditions.replicates) {
     var i, task;

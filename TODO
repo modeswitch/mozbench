@@ -4,3 +4,5 @@
 * manager should persist in-memory data structures to disk and load them on startup
 * port to run on android, now that all native modules deps are removed
 * export finished jobs to disk
+* worker should create a new profile for each task
+* worker should copy a custom profile settings before running tasks

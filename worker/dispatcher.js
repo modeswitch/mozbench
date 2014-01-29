@@ -7,6 +7,7 @@ var path = require('path');
 var http = require('http');
 var spawn = require('child_process').spawn;
 var exec = require('child_process').exec;
+var _ = require('lodash');
 
 var tmp_dir = '/tmp';
 var install_dir = '/tmp';
@@ -78,7 +79,7 @@ function install_package(package_path, install_path, callback) {
 
 var handlers = {
   'worker': {
-    'run': function(options, callback) {
+    'run': function(sender, options, callback) {
       console.log('run', options);
       var worker = this;
 
@@ -93,7 +94,13 @@ var handlers = {
 
       function run_benchmark(install_path) {
         var bin_path = install_path + '/firefox/firefox';
-        var load = options.load + '?worker=' + options.worker;
+
+        var query_string = [
+          ['worker', options.worker].join('='),
+          ['reply', 'http://' + sender].join('=')
+        ].join('&');
+
+        var load = options.load + '?' + query_string;
         var child = spawn(bin_path, ['-no-remote', '-P', 'benchmark', load]);
         child.on('exit', function(code, signal) {
           console.log('exit', code, signal);
@@ -104,7 +111,7 @@ var handlers = {
 
       callback();
     },
-    'reset': function(options, callback) {
+    'reset': function(sender, options, callback) {
       var worker = this;
 
       if(worker.child) {
@@ -123,9 +130,10 @@ var handlers = {
 function Operation(dispatcher, message) {
   var operation = this;
   var handler = handlers;
-  var options = message.options || {};
+  var options = message.data.options || {};
+  var sender = message.host + ':' + message.port;
 
-  var method = message.method.split('.');
+  var method = message.data.method.split('.');
   for(var i = 0; i < method.length; ++i) {
     var key = method[i];
     handler = handler[key];
@@ -135,7 +143,7 @@ function Operation(dispatcher, message) {
   }
 
   this.call = function call(context, callback) {
-    handler.call(context, options, callback);
+    handler.call(context, sender, options, callback);
   };
 }
 

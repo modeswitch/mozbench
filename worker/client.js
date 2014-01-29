@@ -3,6 +3,12 @@ var EventEmitter = require('events').EventEmitter;
 var async = require('../common/async');
 var http = require('http');
 
+function Message(host, port, data) {
+  this.host = host;
+  this.port = port;
+  this.data = data;
+}
+
 function Client(worker_id) {
   var client = this;
   var cached_host;
@@ -30,8 +36,9 @@ function Client(worker_id) {
         }
 
         var json = JSON.parse(data);
+        var message = new Message(host, port, json);
         async(function() {
-          client.emit(Client.E_TASK, json);
+          client.emit(Client.E_TASK, message);
         });
       });
     });

@@ -4,7 +4,8 @@ var http = require('http');
 var _ = require('lodash');
 
 var async = require('../common/async');
-var mdns = require('../common/mdns-beacon');
+// var mdns = require('../common/mdns-beacon');
+var Discover = require('../common/discover');
 var Server = require('./server');
 var Worker = require('./worker');
 var Job = require('./job');
@@ -13,7 +14,7 @@ var Dispatcher = require('./dispatcher');
 function Manager(port) {
   var manager = this;
 
-  var mdns_ad = new mdns.Ad(port, 'overwatch');
+  var beacon = new Discover.Server('mozbench', port);
 
   var jobs = {};
   var available_tasks = [];
@@ -110,7 +111,6 @@ function Manager(port) {
 
   this.start = function start() {
     server.start();
-    mdns_ad.start();
 
     async(function() {
       manager.emit(Manager.E_READY);
@@ -118,7 +118,6 @@ function Manager(port) {
   }
 
   this.stop = function stop() {
-    mdns_ad.stop();
     server.stop();
   };
 

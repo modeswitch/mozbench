@@ -1,6 +1,6 @@
 process.env['AVAHI_COMPAT_NOWARN'] = 1;
 
-var mdns = require('mdns2');
+var Discover = require('./common/discover');
 var zmq = require('zmq');
 var prettyjson = require('prettyjson');
 var util = require('util');
@@ -11,27 +11,20 @@ var http = require('http');
 
 var args = parser.parseArgs();
 
-var svc_t = {
-  'name': 'overwatch',
-  'protocol': 'tcp'
-};
-
 var mgr_host;
 var mgr_port;
 
 if(args.manager) {
 
 } else {
-  var browser = new mdns.Browser(svc_t);
-  browser.on('serviceUp', function(svc_inst) {
-    browser.stop();
-
-    mgr_host = svc_inst.host;
-    mgr_port = svc_inst.port;
+  var beacon = new Discover.Client('mozbench');
+  beacon.on(Discover.Client.E_ANNOUNCE, function(host, port) {
+    mgr_host = host;
+    mgr_port = port;
 
     send_command(mgr_host, mgr_port);
   });
-  browser.start();
+  beacon.search();
 
   setTimeout(function() {
     if(!(mgr_host && mgr_port)) {
@@ -64,6 +57,7 @@ function send_command(mgr_host, mgr_port) {
         data += chunk;
       }
       console.log(JSON.parse(data));
+      process.exit(0);
     })
   });
   req.setHeader('Content-Type', 'application/json');
@@ -72,5 +66,6 @@ function send_command(mgr_host, mgr_port) {
 
   req.on('error', function(err) {
     console.error('error:', err);
+    process.exit(-1);
   });
 }

@@ -1,6 +1,7 @@
 var inherits = require('util').inherits;
 var EventEmitter = require('events').EventEmitter;
-var mdns = require('../common/mdns-beacon');
+var Discover = require('../common/discover');
+
 var uuid = require('uuid');
 var fs = require('fs');
 var async = require('../common/async');
@@ -32,17 +33,17 @@ function Worker() {
   client.on(Client.E_DISCONNECT, function() {
     console.log('disconnected');
     setTimeout(function() {
-      mdns_browser.search();
+      beacon.search();
     }, 5000);
   });
 
-  var mdns_browser = new mdns.Browser('overwatch');
-  mdns_browser.on(mdns.Browser.E_MANAGER, function(host, port) {
+  var beacon = new Discover.Client('mozbench');
+  beacon.on(Discover.Client.E_ANNOUNCE, function(host, port) {
     client.ready(host, port);
   });
 
   this.start = function start() {
-    mdns_browser.search();
+    beacon.search();
 
     async(function() {
       worker.emit(Worker.E_READY);
@@ -50,7 +51,7 @@ function Worker() {
   };
 
   this.stop = function stop() {
-    mdns_browser.stop();
+
   };
 
   this.send = function send(message) {

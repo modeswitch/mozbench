@@ -28,7 +28,6 @@ if(args.manager) {
 
   setTimeout(function() {
     if(!(mgr_host && mgr_port)) {
-      browser.stop();
       console.error('Error: manager not found');
       process.exit(-1);
     }

@@ -1,0 +1,5 @@
+* installer should recognize file types (e.g., .tar.gz) and unpack them accordingly
+* installers needed for other platforms/package types
+* manager should persist in-memory data structures to disk and load them on startup
+* port to run on android, now that all native modules deps are removed
+* export finished jobs to disk

@@ -9,37 +9,7 @@ var spawn = require('child_process').spawn;
 var exec = require('child_process').exec;
 var _ = require('lodash');
 
-var tmp_dir = '/tmp';
 var install_dir = '/tmp';
-
-function download_installer(url, callback) {
-  var package_path = tmp_dir + '/' + path.basename(url);
-
-  if(fs.existsSync(package_path)) {
-    return callback(package_path);
-  }
-
-  var fd = fs.openSync(package_path, 'w+');
-
-  var size = 0;
-  var req = http.request(url, function(res) {
-    res.on('data', function(chunk) {
-      fs.appendFileSync(package_path, chunk, {encoding: 'binary'});
-      size += chunk.length;
-    });
-    res.on('end', function(chunk) {
-      if(chunk) {
-        fs.appendFileSync(package_path, chunk, {encoding: 'binary'});
-        size += chunk.length;
-      }
-      callback(package_path);
-    });
-    res.on('error', function(err) {
-      console.error('error', err);
-      fs.unlinkSync(package_path);
-    });
-  }).end();
-}
 
 function install_package(package_path, install_path, profile_name, callback) {
   if(fs.existsSync(install_path)) {
@@ -76,8 +46,9 @@ function install_package(package_path, install_path, profile_name, callback) {
       var user_js = [
         'user_pref("browser.sessionstore.resume_from_crash", false);',
         'user_pref("app.update.auto", false);',
-        'app.update.auto;true',
-        'app.update.auto;true'
+        'user_pref("app.update.auto", false);',
+        'user_pref("app.update.auto", false);',
+        'user_pref("browser.shell.checkDefaultBrowser", false);'
       ].join('\n');
       fs.writeFileSync(profile_path + '/user.js', user_js);
       callback(install_path);
@@ -95,7 +66,7 @@ var handlers = {
       md5sum.update(options.install);
       var hash = md5sum.digest('hex');
 
-      download_installer(options.install, do_install);
+      worker.downloader.fetch(options.install, do_install);
 
       function do_install(package_path) {
         var install_path = install_dir + '/' + hash;
@@ -161,6 +132,7 @@ function Operation(dispatcher, message) {
 
 function Dispatcher(worker) {
   var dispatcher = this;
+
   this.run = function run(message, callback) {
     var operation = new Operation(dispatcher, message);
     operation.call(worker, callback);

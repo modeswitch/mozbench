@@ -7,6 +7,7 @@ var fs = require('fs');
 var async = require('../common/async');
 var Client = require('./client');
 var Dispatcher = require('./dispatcher');
+var Downloader = require('./downloader');
 
 function Worker() {
   var worker = this;
@@ -21,6 +22,14 @@ function Worker() {
   } else {
     id = fs.readFileSync('wkr_id.json').toString();
   }
+
+  var downloader = new Downloader('/tmp');
+
+  Object.defineProperty(this, 'downloader', {
+    'get': function() {
+      return downloader;
+    }
+  });
 
   var dispatcher = new Dispatcher(worker);
 

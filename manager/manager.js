@@ -73,8 +73,8 @@ function Manager(port) {
     });
     jobs[job.id] = job;
   });
-  dispatcher.on(Dispatcher.E_WORKER, function(worker) {
-    console.log('new worker %s', worker.id);
+  dispatcher.on(Dispatcher.E_WORKER_ONLINE, function(worker) {
+    console.log('worker %s came online', worker.id);
     worker.on(Worker.E_READY, function() {
       if(worker.task && !worker.task.result) {
         console.log('worker %s is running a task', worker.id);
@@ -96,6 +96,12 @@ function Manager(port) {
     });
     workers[worker.id] = worker;
     worker.ready();
+  });
+  dispatcher.on(Dispatcher.E_WORKER_OFFLINE, function(worker) {
+    console.log('worker %s is now offline', worker.id);
+    _.remove(available_workers, function(candidate) {
+      return candidate.id == worker.id;
+    });
   });
 
   var server = new Server(port);

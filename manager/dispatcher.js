@@ -32,7 +32,7 @@ var handlers = {
       if(!worker) {
         var worker = new Worker(sender);
         async(function() {
-          dispatcher.emit(Dispatcher.E_WORKER, worker);
+          dispatcher.emit(Dispatcher.E_WORKER_ONLINE, worker);
         });
       } else {
         worker.ready();
@@ -81,7 +81,12 @@ function Operation(dispatcher, message) {
   };
 
   message.on(Server.E_DISCONNECT, function() {
-    console.error('worker %s disconnected', sender);
+    var worker = dispatcher.manager.find_worker(sender);
+    if(worker) {
+      async(function() {
+        dispatcher.emit(Dispatcher.E_WORKER_OFFLINE, worker);
+      });
+    }
   });
 }
 
@@ -114,6 +119,7 @@ function Dispatcher(manager) {
 inherits(Dispatcher, EventEmitter);
 
 Dispatcher.E_JOB = 'JOB';
-Dispatcher.E_WORKER = 'WORKER';
+Dispatcher.E_WORKER_ONLINE = 'WORKER_ONLINE';
+Dispatcher.E_WORKER_OFFLINE = 'WORKER_OFFLINE';
 
 module.exports = Dispatcher;

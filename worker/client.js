@@ -55,9 +55,7 @@ function Client(worker_id) {
       method: 'worker.ready'
     });
     req.on('close', function() {
-      async(function() {
-        client.emit(Client.E_DISCONNECT);
-      });
+      client.emit(Client.E_DISCONNECT);
     });
     req.on('error', function(err) {
       console.error(err);

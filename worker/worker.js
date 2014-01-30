@@ -39,6 +39,7 @@ function Worker() {
 
   var beacon = new Discover.Client('mozbench');
   beacon.on(Discover.Client.E_ANNOUNCE, function(host, port) {
+    console.log('connecting to manager: %s %s', host, port);
     client.ready(host, port);
   });
 

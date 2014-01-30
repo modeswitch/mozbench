@@ -13,10 +13,10 @@ function Server(name, port) {
 
 function Client(name) {
   var client = this;
+  var polo = Polo();
 
   this.search = function search() {
-    var polo = Polo();
-    polo.on('up', function(found, service) {
+    polo.once('up', function(found, service) {
       if(found == name) {
         client.emit(Client.E_ANNOUNCE, service.host, service.port);
       }

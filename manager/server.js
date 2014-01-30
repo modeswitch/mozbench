@@ -15,16 +15,14 @@ function Message(response, data) {
     response.write(message);
     response.end();
   };
-/*
   response.on('close', function() {
     async(function() {
-      message.emit(Message.E_DISCONNECT);
+      message.emit(Server.E_DISCONNECT);
     });
   });
-*/
 }
 
-inherits(Server, EventEmitter);
+inherits(Message, EventEmitter);
 
 function Server(port) {
   var server = this;

@@ -3,6 +3,7 @@ var EventEmitter = require('events').EventEmitter;
 var async = require('../common/async');
 var Job = require('./job');
 var Worker = require('./worker');
+var Server = require('./server');
 
 var handlers = {
   'client': {
@@ -79,11 +80,9 @@ function Operation(dispatcher, message) {
     handler.call(context, sender, options, operation.reply);
   };
 
-/*
-  message.on(Message.E_DISCONNECT, function() {
-    console.error('client disconnected');
+  message.on(Server.E_DISCONNECT, function() {
+    console.error('worker %s disconnected', sender);
   });
-*/
 }
 
 function Dispatcher(manager) {

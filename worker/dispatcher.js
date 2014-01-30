@@ -41,7 +41,7 @@ function download_installer(url, callback) {
   }).end();
 }
 
-function install_package(package_path, install_path, callback) {
+function install_package(package_path, install_path, profile_name, callback) {
   if(fs.existsSync(install_path)) {
     return callback(install_path);
   }
@@ -70,7 +70,9 @@ function install_package(package_path, install_path, callback) {
 
   function create_profile() {
     var bin_path = install_path + '/firefox/firefox';
-    var child = exec(bin_path + ' -CreateProfile benchmark');
+    var profile_path = install_path + '/profile';
+    console.log(bin_path + ' -CreateProfile "' + profile_name + ' ' + profile_path + '"');
+    var child = exec(bin_path + ' -CreateProfile "' + profile_name + ' ' + profile_path + '"');
     child.on('exit', function(code, signal) {
       callback(install_path);
     });
@@ -83,13 +85,17 @@ var handlers = {
       console.log('run', options);
       var worker = this;
 
+      var md5sum = crypto.createHash('md5');
+      md5sum.update(options.install);
+      var hash = md5sum.digest('hex');
+
       download_installer(options.install, do_install);
 
       function do_install(package_path) {
-        var md5sum = crypto.createHash('md5');
-        md5sum.update(options.install);
-        var install_path = install_dir + '/' + md5sum.digest('hex');
-        install_package(package_path, install_path, run_benchmark);
+        var install_path = install_dir + '/' + hash;
+        var profile_name = hash;
+
+        install_package(package_path, install_path, profile_name, run_benchmark);
       }
 
       function run_benchmark(install_path) {
@@ -101,7 +107,7 @@ var handlers = {
         ].join('&');
 
         var load = options.load + '?' + query_string;
-        var child = spawn(bin_path, ['-no-remote', '-P', 'benchmark', load]);
+        var child = spawn(bin_path, ['-no-remote', '-P', hash, load]);
         child.on('exit', function(code, signal) {
           console.log('exit', code, signal);
           worker.child = null;

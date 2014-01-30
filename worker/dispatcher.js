@@ -1,7 +1,6 @@
 var inherits = require('util').inherits;
 var EventEmitter = require('events').EventEmitter;
 var async = require('../common/async');
-var crypto = require('crypto');
 var fs = require('fs');
 var path = require('path');
 var http = require('http');
@@ -61,16 +60,13 @@ var handlers = {
     'run': function(sender, options, callback) {
       console.log('run', options);
       var worker = this;
-
-      var md5sum = crypto.createHash('md5');
-      md5sum.update(options.install);
-      var hash = md5sum.digest('hex');
+      var profile_name;
 
       worker.downloader.fetch(options.install, do_install);
 
-      function do_install(package_path) {
-        var install_path = install_dir + '/' + hash;
-        var profile_name = hash;
+      function do_install(package_prefix, package_path) {
+        var install_path = install_dir + '/' + package_prefix;
+        profile_name = package_prefix;
 
         install_package(package_path, install_path, profile_name, run_benchmark);
       }
@@ -84,7 +80,7 @@ var handlers = {
         ].join('&');
 
         var load = options.load + '?' + query_string;
-        var child = spawn(bin_path, ['-no-remote', '-P', hash, load]);
+        var child = spawn(bin_path, ['-no-remote', '-P', profile_name, load]);
         child.on('exit', function(code, signal) {
           console.log('exit', code, signal);
           worker.child = null;

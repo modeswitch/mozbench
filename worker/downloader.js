@@ -24,21 +24,23 @@ function Downloader(package_dir) {
       var etag;
       var req = request(target, function(res) {
         var md5sum = crypto.createHash('md5');
+        md5sum.update(target.href);
         md5sum.update(res.headers['etag']);
         md5sum.update(res.headers['last-modified']);
         md5sum.update(res.headers['content-length']);
         var package_prefix = md5sum.digest('hex');
         var package_name = [package_prefix, path.basename(target.path)].join('-');
         var package_path = [package_dir, package_name].join('/');
-        return get_package(package_path);
+
+        return get_package(package_prefix, package_path);
       });
       req.end();
     }
 
-    function get_package(package_path) {
+    function get_package(package_prefix, package_path) {
       if(fs.existsSync(package_path)) {
         console.log('package already downloaded');
-        return callback(package_path);
+        return callback(package_prefix, package_path);
       }
 
       target.method = 'GET';
@@ -50,7 +52,7 @@ function Downloader(package_dir) {
           if(chunk) {
             fs.appendFileSync(package_path, chunk, {encoding: 'binary'});
           }
-          return callback(package_path);
+          return callback(package_prefix, package_path);
         });
         res.on('error', function(err) {
           console.error('error', err);

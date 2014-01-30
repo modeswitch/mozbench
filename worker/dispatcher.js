@@ -71,9 +71,15 @@ function install_package(package_path, install_path, profile_name, callback) {
   function create_profile() {
     var bin_path = install_path + '/firefox/firefox';
     var profile_path = install_path + '/profile';
-    console.log(bin_path + ' -CreateProfile "' + profile_name + ' ' + profile_path + '"');
-    var child = exec(bin_path + ' -CreateProfile "' + profile_name + ' ' + profile_path + '"');
+    var child = exec(bin_path + ' -no-remote -CreateProfile "' + profile_name + ' ' + profile_path + '"');
     child.on('exit', function(code, signal) {
+      var user_js = [
+        'user_pref("browser.sessionstore.resume_from_crash", false);',
+        'user_pref("app.update.auto", false);',
+        'app.update.auto;true',
+        'app.update.auto;true'
+      ].join('\n');
+      fs.writeFileSync(profile_path + '/user.js', user_js);
       callback(install_path);
     });
   }

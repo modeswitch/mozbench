@@ -42,15 +42,19 @@ function install_package(package_path, install_path, profile_name, callback) {
     var profile_path = install_path + '/profile';
     var child = exec(bin_path + ' -no-remote -CreateProfile "' + profile_name + ' ' + profile_path + '"');
     child.on('exit', function(code, signal) {
-      var user_js = [
-        'user_pref("browser.sessionstore.resume_from_crash", false);',
-        'user_pref("app.update.auto", false);',
-        'user_pref("app.update.auto", false);',
-        'user_pref("app.update.auto", false);',
-        'user_pref("browser.shell.checkDefaultBrowser", false);'
-      ].join('\n');
-      fs.writeFileSync(profile_path + '/user.js', user_js);
-      callback(install_path);
+      if(0 == code) {
+        var user_js = [
+          'user_pref("browser.sessionstore.resume_from_crash", false);',
+          'user_pref("app.update.auto", false);',
+          'user_pref("app.update.auto", false);',
+          'user_pref("app.update.auto", false);',
+          'user_pref("browser.shell.checkDefaultBrowser", false);'
+        ].join('\n');
+        fs.writeFileSync(profile_path + '/user.js', user_js);
+        callback(install_path);
+      } else {
+
+      }
     });
   }
 }

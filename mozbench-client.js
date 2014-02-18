@@ -1,5 +1,3 @@
-process.env['AVAHI_COMPAT_NOWARN'] = 1;
-
 var Discover = require('./common/discover');
 var prettyjson = require('prettyjson');
 var util = require('util');

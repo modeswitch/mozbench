@@ -1,6 +1,3 @@
-process.env['AVAHI_COMPAT_NOWARN'] = 1;
-
-var fs = require('fs');
 var Worker = require('./worker/worker');
 
 var wkr = new Worker();
